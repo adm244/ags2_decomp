@@ -11,7 +11,7 @@ This table is updated manually and represents current status of code in the repo
 | Version |  RE  |  SR  |  IM  |
 |---------|------|------|------|
 |  2.00   | 100% | 100% | 100% |
-|  2.01   |  0%  |  0%  |  0%  |
+|  2.01   |  10% |  0%  |  0%  |
 |  2.02   |  0%  |  0%  |  0%  |
 |  2.03   |  0%  |  0%  |  0%  |
 |  2.04   |  0%  |  0%  |  0%  |
