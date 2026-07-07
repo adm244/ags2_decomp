@@ -1,0 +1,40 @@
+# removed everything except static library building
+
+OBJ_DIR = obj
+SRC_DIR = src
+
+LIB_DIR = lib
+LIB_NAME = $(LIB_DIR)/libjgmod.a
+
+OBJ_LIST = \
+$(OBJ_DIR)/file_io.o \
+$(OBJ_DIR)/load_mod.o \
+$(OBJ_DIR)/load_s3m.o \
+$(OBJ_DIR)/load_xm.o \
+$(OBJ_DIR)/load_it.o \
+$(OBJ_DIR)/load_jgm.o \
+$(OBJ_DIR)/save_jgm.o \
+$(OBJ_DIR)/mod.o \
+$(OBJ_DIR)/player.o \
+$(OBJ_DIR)/player2.o \
+$(OBJ_DIR)/player3.o \
+$(OBJ_DIR)/player4.o \
+
+CFLAGS = -g3 -O3 -W -Wno-unused -Wall -ffast-math -fomit-frame-pointer -funroll-loops
+CFLAGS += -Isrc -I../allegro
+
+ifndef CROSS
+CFLAGS += -m486
+endif
+
+.PHONY: all lib
+
+all : $(LIB_NAME)
+
+lib : $(LIB_NAME)
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+$(LIB_NAME) : $(OBJ_LIST)
+	$(AR) rs $(LIB_NAME) $(OBJ_LIST)
