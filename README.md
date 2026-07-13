@@ -13,6 +13,15 @@ Version 2.00 is **complete** and demo game is fully playable. Next milestone wou
 
 For more information refer to [STATUS](./STATUS.md).
 
+## Comparing versions
+
+As more information is gained over time, previously finished versions can be altered slightly. So do **NOT** rely on commit history to get differences between them. Use `git diff --no-index` on source directories instead.
+
+For example, to compare versions 2.00 and 2.01 execute this from project root directory:
+```sh
+git diff --no-index ags200/src ags201/src
+```
+
 ## Building
 
 To build DOS executables you would need either full [DJGPP environment](https://archive.org/details/DJGPP_Development_System_August_1998) running on DOS or DJGPP [cross-compiler](https://github.com/andrewwutw/build-djgpp). If you're planning doing instruction matching use DJGPP environment, otherwise prefer cross-compilation.
