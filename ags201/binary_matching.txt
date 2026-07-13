@@ -1,6 +1,4 @@
 DONE:
-
-TODO:
 vga256
 wsetmode
 wgetmode
@@ -57,7 +55,7 @@ INIreadchar
 INIreaditem
 INIreadint
 INIgetdirec
-restart_game
+(*) restart_game
 setpal
 pack_fopen
 dj_timer_handler
@@ -70,7 +68,7 @@ restore_after_dialog
 restore_game_dialog
 save_game_dialog
 prepare_text_script
-post_script_cleanup
+(*) post_script_cleanup
 run_text_script
 run_text_script_iparam
 run_text_script_2iparam
@@ -96,31 +94,31 @@ enable_cursor_mode
 disable_cursor_mode
 remove_popup_interface
 process_interface_click
-check_controls
+(*) check_controls
 fix_player_sprite
 update_stuff
 printtext
-draw_interface
+(*) draw_interface
 sort_out_walk_behinds
 clear_sprite_list
 add_to_sprite_list
 draw_sprite_list
-draw_screen_background
+(*) draw_screen_background
 draw_topbar
 update_screen
 atexit_handler
-quit
+(*) quit
 setup_sierra_interface
-load_game_file
+(*) load_game_file
 poll_mp3
 do_corner
 draw_button_background
 break_up_text_into_lines
 ensure_text_valid
-_display_at
+(*) _display_at
 DisplayAt
 Display
-DisplaySpeech
+(*) DisplaySpeech
 DisplayMessage
 CaptureScreen
 EndCapture
@@ -141,12 +139,12 @@ add_inventory
 RunDialog
 run_event_block
 isposinbox
-check_click_on_object
+(*) check_click_on_object
 is_pos_on_character
-check_click_on_character
+(*) check_click_on_character
 break_out_seer
 walk_character
-ProcessClick
+(*) ProcessClick
 do_movelist_move
 stopmusic
 update_music_volume
@@ -170,7 +168,7 @@ __Rand
 RefreshMouse
 GetCursorMode
 GiveScore
-GetLocationName
+(*) GetLocationName
 MoveCharacter
 GetPlayerCharacter
 SetCharacterView
@@ -185,14 +183,14 @@ script_debug
 cd_player_control
 get_graph_variable
 set_graph_variable
-run_graph_commandlist
+(*) run_graph_commandlist
 fget_long
 run_graph_script
 run_dialog_request
-do_conversation
+(*) do_conversation
 find_highest_room_entered
 save_game
-load_game
+(*) load_game
 run_event_block_inv
 __actual_invscreen
 invscreen
@@ -204,7 +202,7 @@ run_setup
 main_game_loop
 do_main_cycle
 init_cd_player
-main
+(*) main
 GameStruct
 is_valid_character
 is_valid_object

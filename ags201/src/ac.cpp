@@ -1,6 +1,6 @@
 // Version and build numbers
-#define AC_VERSION_TEXT "2.00 "
-#define ACI_VERSION_TEXT "2.00.028"
+#define AC_VERSION_TEXT "2.01 "
+#define ACI_VERSION_TEXT "2.01.031"
 #define THIS_IS_THE_ENGINE
 
 #include <dos.h>
@@ -76,6 +76,8 @@ extern int  cd_isplayingaudio(int);
 #include "acruntim.h"
 
 extern char*scripttempn;
+
+#define RESTART_POINT_SAVE_GAME_NUMBER 999
 
 block virtual_screen;
 int scrnwid,scrnhit;
@@ -334,6 +336,11 @@ void INIgetdirec(char*wasgv,char*inifil) {
   if (u<=0) INIerror(INI_PARSE_ERROR);
 }
 
+void restart_game() {
+  if (load_game(RESTART_POINT_SAVE_GAME_NUMBER)!=0)
+    quit("unable to restart game (unknown error)");
+}
+
 void setpal() {
   wsetpalette(0,255,palette);
 }
@@ -463,8 +470,9 @@ void post_script_cleanup() {
   }
   inside_script--;
   if (request_dialog>=0) {
-    do_conversation(request_dialog);
+    int dlgnum=request_dialog;
     request_dialog=-1;
+    do_conversation(dlgnum);
   }
   if (request_restoregame) {
     request_restoregame--;
@@ -1005,6 +1013,7 @@ void check_controls() {
     //if (kgn==2) Display("Some for�ign text");
     //if (kgn==2) do_conversation(5);
     if ((kgn>='a') & (kgn<='z')) kgn-=32;
+    if (kgn==367) restart_game();
     if (screen_state==1) {
       screen_state=0;
       wfreeblock(screenop);
@@ -1251,7 +1260,7 @@ void draw_interface(InterfaceElement*iep,int ienum) {
       outxp-=textwid/2;
     if (iep->vtextalign==VTA_RIGHT)
       outxp-=textwid;
-    wtextcolor(TEXTFG);
+    wtextcolor(iep->fgcol);
     wtexttransparent(TEXTFG);
     printtext(outxp,outyp,iep->x2-iep->x,iep->vtext);
   }
@@ -1351,6 +1360,15 @@ void draw_screen_background() {
     CharacterInfo*chin=&game.chars[aa];
     sppic=views[chin->view].frames[chin->loop][chin->frame].pic;
     onarea=getpixel(thisroom.walls,chin->x,chin->y);
+    if (onarea==0) {
+      // the path finder sometimes slightly goes into non-walkable areas;
+      // so check for scaling in adjacent pixels
+      const int TRYGAP=2;
+      onarea=getpixel(thisroom.walls,chin->x+2,chin->y);
+      if (onarea==0) onarea=getpixel(thisroom.walls,chin->x-2,chin->y);
+      if (onarea==0) onarea=getpixel(thisroom.walls,chin->x,chin->y+2);
+      if (onarea==0) onarea=getpixel(thisroom.walls,chin->x,chin->y-2);
+    }
     zoom_level=100;
     if (chin->flags & CHF_MANUALSCALING) ;
     else if ((onarea>=0) & (onarea<MAX_WALK_AREAS)) {
@@ -1478,6 +1496,7 @@ void quit(char*quitmsg) {
   if (play.debug_mode!=0)
     printf("Average fps: %d\n",fps);
 
+  remove("agssave.999");
   system("del ~ac*.tmp");
   proper_exit=1;
   exit(3);
@@ -1522,7 +1541,8 @@ int load_game_file() {
   char teststr[31];
   teststr[30]=0;
   fread(&teststr[0],30,1,iii);
-  if (getw(iii)!=5) {
+  int filever=getw(iii);
+  if (filever!=6) {
     fclose(iii);
     return -2;
   }
@@ -1570,6 +1590,8 @@ int load_game_file() {
 
   fclose(iii);
 
+  if (game.numfonts==0) return -2;
+
   for (ee=0;ee<game.numcharacters;ee++) {
     game.chars[ee].walking=0;
     game.chars[ee].animating=0;
@@ -1585,6 +1607,13 @@ int load_game_file() {
   scAdd_External_Symbol("player",playerchar);
   gameinst = (scInstance*)scCreate_Instance(compiled_script,"");
   if (gameinst == NULL) return -3;
+
+  char filnm[20];
+  for (ee=0;ee<game.numfonts;ee++) {
+    sprintf(filnm,"agsfnt%d.wfn",ee);
+    fonts[ee]=wloadfont(filnm);
+  }
+  usetup.textheight=wgettextheight("ZHwypqhkilIK",fonts[0])+1;
 
   return 0;
 }
@@ -1691,7 +1720,7 @@ void ensure_text_valid(char*text) {
 
 void _display_at(int xx,int yy,int wii,char*todis,int blocking,int asspch) {
   int usingfont=FONT_NORMAL;
-  if (asspch) usingfont=FONT_SPEECH;
+  if (asspch) usingfont=FONT_SPEECHBACK;
   ensure_text_valid(todis);
   break_up_text_into_lines(wii-6,usingfont,todis);
   int texthit = wgettextheight("ZHwypqhkilIK",fonts[usingfont]);
@@ -1713,10 +1742,12 @@ void _display_at(int xx,int yy,int wii,char*todis,int blocking,int asspch) {
     for (ee=0;ee<numlines;ee++) {
       int ttxp=wii/2 - wgettextwidth(lines[ee],fonts[usingfont])/2;
       int ttyp=ee*texthit+3;
-      wtextcolor(16);
-      wgtprintf(ttxp,ttyp,fonts[1],lines[ee]);
+      if (game.fontoutline[usingfont]>=0) {
+        wtextcolor(16);
+        wgtprintf(ttxp,ttyp,fonts[game.fontoutline[usingfont]],lines[ee]);
+      }
       wtextcolor(asspch);
-      wgtprintf(ttxp,ttyp,fonts[2],lines[ee]);
+      wgtprintf(ttxp,ttyp,fonts[usingfont],lines[ee]);
     }
   }
   else {
@@ -1794,6 +1825,7 @@ void Display(char*texx, ...) {
   _display_at(-1,-1,scrnwid/2+scrnwid/4,displbuf,1,0);
 }
 
+#define CHANIM_SPEED 5
 void DisplaySpeech(char*texx,int askip,int aschar) {
   if (askip!=0)
     play.messagetime=(strlen(texx)/15+1)*frames_per_second;
@@ -1801,6 +1833,7 @@ void DisplaySpeech(char*texx,int askip,int aschar) {
   textcol&=0xff;
   int widd=scrnwid/2+scrnwid/4;
   int tdxp=-1,tdyp=-1;
+  int oldview=-1;
   if (game.chars[aschar].room==displayed_room) {
     tdxp=game.chars[aschar].x*sxmult-offsetx;
     if (tdxp<2) tdxp=2;
@@ -1808,8 +1841,21 @@ void DisplaySpeech(char*texx,int askip,int aschar) {
     tdyp=game.chars[aschar].y*symult-spriteheight[sppic]-offsety-25;
     if (tdyp<5) tdyp=5;
     tdxp=-tdxp;  // tell it to centre it
+    if (game.chars[aschar].talkview>=0) {
+      oldview=game.chars[aschar].view;
+      game.chars[aschar].animating=(1 | CHANIM_REPEAT | (CHANIM_SPEED << 8));
+      game.chars[aschar].view=game.chars[aschar].talkview;
+      game.chars[aschar].frame=0;
+      game.chars[aschar].flags|=CHF_FIXVIEW;
+    }
   }
   _display_at(tdxp,tdyp,widd,texx,0,textcol);
+  if (oldview>=0) {
+    game.chars[aschar].flags&=(~CHF_FIXVIEW);
+    game.chars[aschar].view=oldview;
+    game.chars[aschar].animating=0;
+    game.chars[aschar].frame=0;
+  }
 }
 
 int display_message=0;
@@ -2133,7 +2179,8 @@ int check_click_on_object(int xx,int yy,int mood) {
       else if (mood==MODE_HAND) passon=1;
       else if (mood==MODE_TALK) passon=2;
       else if (mood==MODE_USE) { passon=3;
-        cdata=playerchar->activeinv; }
+        cdata=playerchar->activeinv;
+        play.usedinv=cdata; }
       if (passon>=0) { evblockbasename="object%d"; evblocknum=aa;
         run_event_block(&croom->objcond[aa],passon,cdata);
         return 1; }
@@ -2169,6 +2216,7 @@ int check_click_on_character(int xx,int yy,int mood) {
     else if (mood==MODE_TALK) passon=2;
     else if (mood==MODE_USE) { passon=3;
       cdata=playerchar->activeinv;
+      play.usedinv=cdata;
       }
     evblockbasename="character%d"; evblocknum=cc;
     if (passon>=0)
@@ -2222,6 +2270,7 @@ void ProcessClick(int xx,int yy,int mood) {
   else if (mood==MODE_HAND) passon=2;
   else if (mood==MODE_USE) { passon=3;
     cdata=playerchar->activeinv;
+    play.usedinv=cdata;
   }
   if ((game.options[OPT_WALKONLOOK]==0) & (mood==MODE_LOOK)) ;
   else if (mood!=MODE_WALK)
@@ -2501,6 +2550,10 @@ void GiveScore(int amnt) {
 void GetLocationName(int xxx,int yyy,char*tempo) {
   xxx+=offsetx/sxmult;
   yyy+=offsety/symult;
+  if ((xxx>=thisroom.width) | (xxx<0) | (yyy<0) | (yyy>=thisroom.height)) {
+    tempo[0]=0;
+    return;
+  }
   tempo[0]=0;
   int onhs,aa;
   // on character
@@ -2772,6 +2825,11 @@ int run_graph_commandlist(int ct) {
         if (run_graph_commandlist(gse->branchto)==0)
           return 0;
         break;
+      case 26: // if inventory %d was used
+        if (play.usedinv!=gse->_using) break;
+        if (run_graph_commandlist(gse->branchto)==0)
+          return 0;
+        break;
       case 25: // move man to obj
         MoveCharacterToObject(game.playercharacter,gse->_using);
         break;
@@ -2875,6 +2933,8 @@ void do_conversation(int dlgnum) {
     write_screen();
     wtexttransparent(TEXTFG);
     char disporder[MAXTOPICOPTIONS];
+    short dispyp[MAXTOPICOPTIONS];
+    int areawid;
     numdisp=0;
     for (ww=0;ww<dtop->numoptions;ww++) {
       if ((dtop->optionflags[ww] & DFLG_ON)==0) ;
@@ -2890,32 +2950,49 @@ void do_conversation(int dlgnum) {
         InterfaceElement*iep=&game.iface[game.options[OPT_DIALOGIFACE]-1];
         dlgxp=iep->x; dlgyp=iep->y;
         rectfill(abuf,dlgxp,dlgyp,iep->x2,iep->y2,currentcolor);
+        areawid=iep->x2-dlgxp-5;
       }
       else {
         dlgyp=scrnhit-numdisp*txthit-1;
         rectfill(abuf,0,dlgyp-1,scrnwid-1,scrnhit-1,currentcolor);
+        areawid=scrnwid-5;
       }
-      int mouseison=-1;
+      int mouseison=-1,curyp;
+      int cc;
+      int mousewason=-10; mouseison=-10;
 redraw_options:
+      curyp=dlgyp+1;
       for (ww=0;ww<numdisp;ww++) {
         wtextcolor((playerchar->flags & OCHF_SPEECHCOL) >> OCHF_SPEECHCOLSHIFT);
         if (mouseison==ww) wtextcolor(14);
-        wouttextxy(dlgxp,dlgyp+ww*txthit,fonts[font],dtop->optionnames[disporder[ww]]);
+        break_up_text_into_lines(areawid-5,1,dtop->optionnames[disporder[ww]]);
+        dispyp[ww]=curyp;
+        for (cc=0;cc<numlines;cc++) {
+          wouttextxy(dlgxp+((cc==0)?0:6),curyp,fonts[usingfont],lines[cc]);
+          curyp+=txthit;
+        }
+        curyp+=game.options[OPT_DIALOGGAP];
       }
       domouse(1);
       while (1) {
         domouse(0);
         poll_mp3();
-        if (mgetbutton()!=NONE) {
-          if (mousey<dlgyp) continue;
-          chose=(mousey-dlgyp)/txthit;
-          if ((chose<0) | (chose>=numdisp)) ;
-          else { chose=disporder[chose];
-            break;
+        mousewason=mouseison;
+        mouseison=-1;
+        if ((mousey<=dlgyp) | (mousey>curyp)) ;
+        else {
+          mouseison=numdisp-1;
+          for (ww=0;ww<numdisp;ww++) {
+            if (mousey<dispyp[ww]) { mouseison=ww-1; break; }
           }
+          if ((mouseison<0) | (mouseison>=numdisp)) mouseison=-1;
         }
-        if (mouseison!=(mousey-dlgyp)/txthit) {
-          mouseison=(mousey-dlgyp)/txthit;
+        if (mgetbutton()!=NONE) {
+          if (mouseison<0) continue;
+          chose=disporder[mouseison];
+          break;
+        }
+        if (mousewason!=mouseison) {
           domouse(2);
           goto redraw_options;
         }
@@ -2923,6 +3000,7 @@ redraw_options:
       domouse(2);
     }
     else chose=disporder[0]; // only one choice, so select it
+    while (kbhit()) getch(); // empty keyboard buffer
     cremovemenu();
     DisplaySpeech(dtop->optionnames[chose],1,game.playercharacter);
     tocar=run_dialog_request(dtop,dtop->entrypoints[chose]);
@@ -3089,7 +3167,9 @@ int load_game(int slotn) {
   int curwas=cur_cursor;
   set_cursor_mode(cur_mode);
   set_mouse_cursor(curwas);
+  int gstimer=play.gscript_timer;
   load_new_room(displayed_room,NULL);
+  play.gscript_timer=gstimer;
   in_new_room=3;
   return 0;
 }
@@ -3521,10 +3601,29 @@ int main(int argc,char**argv)
     roomstats[ee].tsdatasize=0;
     roomstats[ee].tsdata=NULL;
     }
+  printf("Checking sound inits.\n");
+  allegro_init();
+  if (usetup.mod_player) reserve_voices(NUM_MOD_DIGI_VOICES+2,-1);
+  if (install_sound(usetup.digicard,usetup.midicard,NULL)!=0) {
+    reserve_voices(-1,-1);
+    opts.mod_player=0;
+    opts.mp3_player=0;
+    if (install_sound(usetup.digicard,usetup.midicard,NULL)!=0) {
+      printf("\nUnable to initialize your audio hardware.\n");
+      printf("[Problem: %s]\n",allegro_error);
+      proper_exit=1;
+      return 7;
+    }
+  }
+  else {
+    if (usetup.mp3_player==0) ;
+    else install_amp();
+  }
   atexit(atexit_handler);
   srand(time(NULL) % 2000);
   init_pathfinder();
-  vga256();
+  set_gfx_mode(GFX_VGA,320,200,320,200);
+  abuf=screen; vesa_xres=320; vesa_yres=200;
   scrnwid=320;
   scrnhit=200;
   if (usetup.screenres==1) {
@@ -3562,23 +3661,6 @@ int main(int argc,char**argv)
     wfreeblock(splashsc);
   }
   install_timer();
-  if (usetup.mod_player) reserve_voices(NUM_MOD_DIGI_VOICES+2,-1);
-  if (install_sound(usetup.digicard,usetup.midicard,NULL)!=0) {
-    reserve_voices(-1,-1);
-    opts.mod_player=0;
-    opts.mp3_player=0;
-    if (install_sound(usetup.digicard,usetup.midicard,NULL)!=0) {
-      set_gfx_mode(GFX_TEXT,80,25,0,0);
-      printf("Unable to initialize your audio hardware.\n");
-      printf("[Problem: %s]\n",allegro_error);
-      proper_exit=1;
-      return 7;
-    }
-  }
-  else {
-    if (usetup.mp3_player==0) ;
-    else install_amp();
-  }
   LOCK_VARIABLE(timerloop);
   LOCK_FUNCTION((void*)dj_timer_handler);
   set_game_speed(40);
@@ -3587,10 +3669,6 @@ int main(int argc,char**argv)
       quit("install_mod: MOD player initalize failed.");
     }
   }
-  fonts[0]=wloadfont("cwind.wfn");
-  fonts[1]=wloadfont("sq4fontb.wfn");
-  fonts[2]=wloadfont("sq4font.wfn");
-  usetup.textheight=wgettextheight("ZHwypqhkilIK",cbuttfont)+1;
   virtual_screen=create_bitmap(scrnwid,scrnhit);
   clear(virtual_screen);
   if (wloadsprites(temppal,"acsprset.spr",images,0,MAX_SPRITES)) {
@@ -3687,6 +3765,8 @@ int main(int argc,char**argv)
   gettime(&t1);
   lastcounter=0;
   loopcounter=0;
+  main_game_loop();
+  save_game(RESTART_POINT_SAVE_GAME_NUMBER,"restart game position");
   while (true) {
     main_game_loop();
   }

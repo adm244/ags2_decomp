@@ -1064,14 +1064,16 @@ struct DialogTopic {
 #define PAL_BACKGROUND      2
 #define MAXGLOBALMES        500
 #define MAXLANGUAGE         5
+#define MAX_FONTS           10
 #define OPT_DEBUGMODE       0
 #define OPT_SCORESOUND      1
 #define OPT_WALKONLOOK      2
 #define OPT_DIALOGIFACE     3
 #define OPT_ANTIGLIDE       4
 #define OPT_TWCUSTOM        5
+#define OPT_DIALOGGAP       6
 
-struct GameStruct {
+struct OriGameStruct {
   char              gamename[30];
   char              options[20];
   unsigned char     paluses[256];
@@ -1092,10 +1094,17 @@ struct GameStruct {
   short             numinvitems;
   InventoryItemInfo invinfo[100];
   int               numdialog, numdlgmessage;
-  int               reserved[8];
+  int               numfonts;
+  int               reserved[7];
   short             numlang;
   char              langcodes[MAXLANGUAGE][3];
   char              *messages[MAXGLOBALMES];
+};
+
+struct GameStruct : public OriGameStruct {
+  unsigned char     fontflags[MAX_FONTS];
+  char              fontoutline[MAX_FONTS];
+  int               reserved2[10];
 };
 
 #ifndef ROOMEDIT
