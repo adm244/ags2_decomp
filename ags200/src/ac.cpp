@@ -2859,8 +2859,8 @@ int run_dialog_request(DialogTopic*dtop,int topic) {
 }
 
 void do_conversation(int dlgnum) {
-  int dlgxp=1,dlgyp=symult*160,font=0;
-  int txthit=wgettextheight("ZHwypqhkilIK",fonts[font]);
+  int dlgxp=1,dlgyp=symult*160,usingfont=FONT_NORMAL;
+  int txthit=wgettextheight("ZHwypqhkilIK",fonts[usingfont]);
   int dlgnumwas=-1,curwas=cur_cursor;
   DialogTopic*dtop=&dialog[dlgnum];
   // run the startup script
@@ -2874,7 +2874,7 @@ void do_conversation(int dlgnum) {
     if (dlgnumwas!=dlgnum) dlgnumwas=dlgnum;
     write_screen();
     wtexttransparent(TEXTFG);
-    char disporder[15];
+    char disporder[MAXTOPICOPTIONS];
     numdisp=0;
     for (ww=0;ww<dtop->numoptions;ww++) {
       if ((dtop->optionflags[ww] & DFLG_ON)==0) ;
@@ -2895,11 +2895,11 @@ void do_conversation(int dlgnum) {
         dlgyp=scrnhit-numdisp*txthit-1;
         rectfill(abuf,0,dlgyp-1,scrnwid-1,scrnhit-1,currentcolor);
       }
-      int mousewason=-1;
+      int mouseison=-1;
 redraw_options:
       for (ww=0;ww<numdisp;ww++) {
         wtextcolor((playerchar->flags & OCHF_SPEECHCOL) >> OCHF_SPEECHCOLSHIFT);
-        if (mousewason==ww) wtextcolor(14);
+        if (mouseison==ww) wtextcolor(14);
         wouttextxy(dlgxp,dlgyp+ww*txthit,fonts[font],dtop->optionnames[disporder[ww]]);
       }
       domouse(1);
@@ -2914,8 +2914,8 @@ redraw_options:
             break;
           }
         }
-        if (mousewason!=(mousey-dlgyp)/txthit) {
-          mousewason=(mousey-dlgyp)/txthit;
+        if (mouseison!=(mousey-dlgyp)/txthit) {
+          mouseison=(mousey-dlgyp)/txthit;
           domouse(2);
           goto redraw_options;
         }
