@@ -223,7 +223,6 @@ struct PolyPoints {
 #define IBACT_SETMODE   1
 #define IBACT_SCRIPT    2
 #define IBFLG_ENABLED   1
-#define IBFLG_INVBOX    2
 struct InterfaceButton {
   int x, y, pic, overpic, pushpic, leftclick;
   int rightclick; // if inv, then leftclick = wid, rightclick = hit
@@ -1018,7 +1017,7 @@ struct CharacterInfo {
   short loop, frame;
   short walking, animating;
   short walkspeed, animspeed;
-  short inv[100];
+  short inv[MAX_INV];
   short actx, acty;
   char  name[30];
   char  scrname[16];

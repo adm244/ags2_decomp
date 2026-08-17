@@ -20,6 +20,8 @@ char *clibendfilesig = "CLIB\x1\x2\x3\x4SIGE";
 
 extern "C"
 {
+  long last_opened_size;
+
   int csetlib(char *namm, char *passw)
   {
     if (namm == NULL) {

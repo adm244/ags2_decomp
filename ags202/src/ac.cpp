@@ -1223,11 +1223,12 @@ void draw_interface(InterfaceElement*iep,int ienum) {
   if (ismouseinbox(iep->x,iep->y,iep->x2,iep->y2)==-1)
     mouse_on_iface=ienum;
 
-  int ee;
+  int ee,pic;
+  int tdxp,tdyp;
   for (ee=0;ee<iep->numbuttons;ee++) {
-    int pic=iep->button[ee].pic;
-    int tdxp=iep->button[ee].x+iep->x;
-    int tdyp=iep->button[ee].y+iep->y;
+    pic=iep->button[ee].pic;
+    tdxp=iep->button[ee].x+iep->x;
+    tdyp=iep->button[ee].y+iep->y;
     if (mouse_on_iface!=ienum) ;
     else if (iep->button[ee].flags==0) ;
     else if (play.disabled_user_interface!=0) ;
@@ -1250,11 +1251,12 @@ void draw_interface(InterfaceElement*iep,int ienum) {
     }
   }
 
+  wgtfont fnt;
+  int outxp,outyp;
   if (iep->vtext[0]!=0) {
-    wgtfont fnt=cbuttfont;
-    int outxp=iep->vtextxp+iep->x;
-    int t1,t2,t3;
-    int outyp=iep->vtextyp+iep->y;
+    fnt=cbuttfont;
+    outxp=iep->vtextxp+iep->x;
+    outyp=iep->vtextyp+iep->y;
     int textwid=wgettextwidth(iep->vtext,fnt);
     if (iep->vtextalign==VTA_CENTRE)
       outxp-=textwid/2;
