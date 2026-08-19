@@ -2902,7 +2902,7 @@ redraw_options:
       for (ww=0;ww<numdisp;ww++) {
         wtextcolor((playerchar->flags & OCHF_SPEECHCOL) >> OCHF_SPEECHCOLSHIFT);
         if (mouseison==ww) wtextcolor(14);
-        wouttextxy(dlgxp,dlgyp+ww*txthit,fonts[font],dtop->optionnames[disporder[ww]]);
+        wouttextxy(dlgxp,dlgyp+ww*txthit,fonts[usingfont],dtop->optionnames[disporder[ww]]);
       }
       domouse(1);
       while (1) {
