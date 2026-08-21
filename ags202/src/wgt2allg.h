@@ -221,10 +221,8 @@ wgtfont wloadfont(char*filnm) {
   fread(mbuffer,15,1,ffi);
   if (strcmp(mbuffer,testst)!=0) { fclose(ffi); return NULL; }
   long lenof=filelength(fileno(ffi));
-#ifdef USE_CLIB
-//  lenof=last_opened_size;
-  if (cliboffset(filnm)>0) lenof=clibfilesize(filnm);
-#endif
+  // clibfopen will have set last_opened_size
+  lenof=last_opened_size;
   tempalloc=(wgtfont)malloc(lenof+40);
   fclose(ffi);
   ffi=fopen(filnm,"rb");

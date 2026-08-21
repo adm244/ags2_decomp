@@ -22,6 +22,10 @@ These notes describe GCC 2 compiler and standard libs behavior. Might be specifi
 
 * Stack size does not always correspond to local variables count. Compiler might reuse stack space if variable goes out of scope. This might hint to which scope variable belongs to.
 
+* Changing operand order can impact the entire function. The order of memory accesses in a single expression may increase register pressure, forcing the compiler to rely on excessive stack-based operations.
+
+* Splitting a single expression into multiple ones produces different instructions.
+
 ## Continue and Break
 
 ```c

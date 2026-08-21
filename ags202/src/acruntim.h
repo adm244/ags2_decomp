@@ -4,6 +4,7 @@
 #include <libamp.h>
 #include <jgmod.h>
 
+#define MAX_MAXSTRLEN 200
 #define MAXGLOBALVARS 50
 
 // This struct is only used in save games and by plugins
@@ -83,6 +84,8 @@ struct GameState {
   int  globalvars[MAXGLOBALVARS];  // graphical script variables
   int  messagetime;      // time left for auto-remove messages
   int  usedinv;          // inventory item last used
+  int  inv_top,inv_numdisp,inv_numorder,inv_numinline;
+  short inv_order[100];
 };
 
 #define NUM_DIGI_VOICES     16

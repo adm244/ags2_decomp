@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <io.h>
+
 char clib32copyright[] = "CLIB32 v1.1 (c) 1995,1996,1998 Chris Jones";
 char lib_file_name[80] = " ";
 char clbuff[20];
@@ -122,6 +124,7 @@ extern "C"
 
   FILE *clibfopen(char *filnamm, char *fmt)
   {
+    last_opened_size = -1;
     if (cfopenpriority == PR_FILEFIRST) {
       // check for file, otherwise use datafile
       if (fmt[0] != 'r') {
@@ -132,6 +135,7 @@ extern "C"
         if ((tfil == NULL) && (lib_file_name[0] != ' ') && (cliboffset(filnamm) >= 0)) {
           tfil = fopen(lib_file_name, fmt);
           fseek(tfil, cliboffset(filnamm), SEEK_SET);
+          last_opened_size = clibfilesize(filnamm);
         }
       }
 
@@ -142,9 +146,13 @@ extern "C"
       else {
         tfil = fopen(lib_file_name, fmt);
         fseek(tfil, cliboffset(filnamm), SEEK_SET);
+        last_opened_size = clibfilesize(filnamm);
       }
 
     }
+
+    if (last_opened_size < 0)
+      last_opened_size = filelength(fileno(tfil));
 
     return tfil;
   }

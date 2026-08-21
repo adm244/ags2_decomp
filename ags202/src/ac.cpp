@@ -1,6 +1,6 @@
 // Version and build numbers
-#define AC_VERSION_TEXT "2.01 "
-#define ACI_VERSION_TEXT "2.01.031"
+#define AC_VERSION_TEXT "2.02 "
+#define ACI_VERSION_TEXT "2.02.035"
 #define THIS_IS_THE_ENGINE
 
 #include <dos.h>
@@ -115,8 +115,14 @@ char*messages[MAXGLOBALMES];
 int _global_x_offset=-1, _global_y_offset=0;
 int screen_state=0;
 int ccSymOffset=0;
-int proper_exit=0;
+int proper_exit=0,our_eip=0;
 int scaddr=0;
+#define DBG_NOIFACE       1
+#define DBG_NODRAWSPRITES 2
+#define DBG_NOOBJECTS     4
+#define DBG_NOUPDATE      8
+#define DBG_NOSFX      0x10
+#define DBG_NOMUSIC    0x20
 #define MAXEVENTS 15
 EventHappened event[MAXEVENTS];
 int numevents=0;
@@ -148,6 +154,8 @@ int restrict_until=0;
 int mouse_on_iface=-1;   // mouse cursor is over this interface
 int mouse_on_iface_button=-1;
 int mouse_pushed_iface=-1;  // this BUTTON on interface MOUSE_ON_IFACE is pushed
+int mouse_ifacebut_xoffs=-1,mouse_ifacebut_yoffs=-1;
+int debug_flags=0;
 int request_newroom=0;
 int request_invscreen=0;
 int request_restoregame=0;
@@ -910,7 +918,7 @@ void enable_cursor_mode(int modd) {
   for (uu=0;uu<game.numiface;uu++) {
     for (ww=0;ww<game.iface[uu].numbuttons;ww++) {
       if ((game.iface[uu].button[ww].leftclick)!=mod) continue;
-      game.iface[uu].button[ww].flags=IBFLG_ENABLED;
+      game.iface[uu].button[ww].flags|=IBFLG_ENABLED;
       }
     }
   }
@@ -923,7 +931,7 @@ void disable_cursor_mode(int modd) {
   for (uu=0;uu<game.numiface;uu++) {
     for (ww=0;ww<game.iface[uu].numbuttons;ww++) {
       if ((game.iface[uu].button[ww].leftclick)!=mod) continue;
-      game.iface[uu].button[ww].flags=0;
+      game.iface[uu].button[ww].flags&=~IBFLG_ENABLED;
       }
     }
   if (cur_mode==modd) find_next_enabled_cursor(modd);
@@ -951,6 +959,28 @@ void process_interface_click(int ifce,int btn) {
     run_text_script_2iparam(gameinst,"interface_click",ifce+1,btn);
 }
 
+int offset_over_inv() {
+  int mover=mouse_ifacebut_xoffs/(sxmult*40)+(mouse_ifacebut_yoffs/(sxmult*22)*play.inv_numinline);
+  mover+=play.inv_top;
+  if ((mover<0) | (mover>=play.inv_numorder))
+    return -1;
+  return play.inv_order[mover];
+}
+
+void run_event_block_inv(EventBlock*evpt,int evnt,int invn=-1,int updd=1) {
+  if (updd) {
+    domouse(2);
+    abuf=virtual_screen;
+    wputblock(0,0,screen,0);
+  }
+  evblockbasename="inventory%d";
+  run_event_block(evpt,evnt,invn);
+  if (updd) {
+    abuf=screen;
+    domouse(1);
+  }
+}
+
 // check_controls: checks mouse & keyboard interface
 void check_controls() {
   int ll;
@@ -973,7 +1003,16 @@ void check_controls() {
       mouse_pushed_iface=-1;
       if ((game.iface[wasonie].popup==POPUP_MOUSEY) && (ifacepopped==wasonie))
         remove_popup_interface(wasonie);
-      setevent(EV_IFACECLICK,wasonie,wasbutdown,0);
+      if ((game.iface[wasonie].button[wasbutdown].flags & IBFLG_INVBOX)!=0) {
+        int iit=offset_over_inv();
+        if (iit>=0) {
+          if (cur_mode==MODE_LOOK) run_event_block_inv(&game.invcond[iit],0,-1,0);
+          if (cur_mode==MODE_USE) {
+            play.usedinv=playerchar->activeinv;
+            run_event_block_inv(&game.invcond[iit],3,play.usedinv,0);
+          }
+        }
+      } else setevent(EV_IFACECLICK,wasonie,wasbutdown,0);
     }
   }
   ll=mgetbutton();
@@ -982,13 +1021,21 @@ void check_controls() {
       InterfaceElement*iep=&game.iface[mouse_on_iface];
       int pushedie=-1;
       for (ll=0;ll<iep->numbuttons;ll++) {
-        if (iep->button[ll].flags==0) continue;
+        if ((iep->button[ll].flags & IBFLG_ENABLED)==0) continue;
         int xoffs=iep->x+iep->button[ll].x;
         int yoffs=iep->y+iep->button[ll].y;
-        if (ismouseinbox(xoffs,yoffs,xoffs+spritewidth[iep->button[ll].pic],
-              yoffs+spriteheight[iep->button[ll].pic])==-1) {
-          pushedie=ll;
-          break;
+        if ((iep->button[ll].flags & IBFLG_INVBOX)!=0) {
+          if (ismouseinbox(xoffs,yoffs,xoffs+iep->button[ll].leftclick,
+                yoffs+iep->button[ll].rightclick)==-1) {
+            pushedie=ll;
+            break;
+          }
+        } else {
+          if (ismouseinbox(xoffs,yoffs,xoffs+spritewidth[iep->button[ll].pic],
+                yoffs+spriteheight[iep->button[ll].pic])==-1) {
+            pushedie=ll;
+            break;
+          }
         }
       }
       if (pushedie>=0)
@@ -996,10 +1043,13 @@ void check_controls() {
     }
     else {
       if (screen_state==1) {
-        screen_state=0;
-        _global_x_offset=-1;
-        wfreeblock(screenop);
-        screenop=NULL;
+        if (game.options[OPT_NOSKIPTEXT]!=0) ;
+        else {
+          screen_state=0;
+          _global_x_offset=-1;
+          wfreeblock(screenop);
+          screenop=NULL;
+        }
       }
       else if (play.disabled_user_interface!=0) ;
       else setevent(EV_TEXTSCRIPT,TS_MCLICK,ll+1,0);
@@ -1016,6 +1066,7 @@ void check_controls() {
     if (kgn==367) restart_game();
     if (screen_state==1) {
       screen_state=0;
+      _global_x_offset=-1;
       wfreeblock(screenop);
       screenop=NULL;
     }
@@ -1210,6 +1261,18 @@ void printtext(int xx,int yy,int ww, char*text) {
   }
 }
 
+void update_invorder() {
+  play.inv_numorder=0;
+  int ff;
+  // Iterate through all inv items, adding them once to the list.
+  for (ff=0;ff<game.numinvitems;ff++) {
+    if (playerchar->inv[ff]>0) {
+      play.inv_order[play.inv_numorder]=ff;
+      play.inv_numorder++;
+    }
+  }
+}
+
 void draw_interface(InterfaceElement*iep,int ienum) {
   if (iep->on==0) return;
   if (iep->bgcol<0)
@@ -1224,29 +1287,65 @@ void draw_interface(InterfaceElement*iep,int ienum) {
     mouse_on_iface=ienum;
 
   int ee,pic;
-  int tdxp,tdyp;
+  int tdxp,tdyp,offsx,offsy;
+  char err[150];
   for (ee=0;ee<iep->numbuttons;ee++) {
     pic=iep->button[ee].pic;
     tdxp=iep->button[ee].x+iep->x;
     tdyp=iep->button[ee].y+iep->y;
+    if ((iep->button[ee].flags & IBFLG_INVBOX)!=0) {
+      offsx=iep->button[ee].leftclick;
+      offsy=iep->button[ee].rightclick;
+    } else {
+      if ((pic<0) || (pic>=MAX_SPRITES) || (images[pic]==NULL)) {
+        sprintf(err,"interface draw error: unknown pic (if %d, but %d, pic=%d, numbut=%d)",ienum,ee,pic,iep->numbuttons);
+        quit(err);
+      } else {
+        offsx=spritewidth[iep->button[ee].pic];
+        offsy=spriteheight[iep->button[ee].pic];
+      }
+    }
     if (mouse_on_iface!=ienum) ;
-    else if (iep->button[ee].flags==0) ;
+    else if ((iep->button[ee].flags & IBFLG_ENABLED)==0) ;
     else if (play.disabled_user_interface!=0) ;
     else {
-      if (ismouseinbox(tdxp,tdyp,tdxp+spritewidth[iep->button[ee].pic],tdyp+spriteheight[iep->button[ee].pic])==-1) {
+      if (ismouseinbox(tdxp,tdyp,tdxp+offsx,tdyp+offsy)==-1) {
         mouse_on_iface_button=ee;
+        mouse_ifacebut_xoffs=mousex-tdxp;
+        mouse_ifacebut_yoffs=mousey-tdyp;
         if ((mouse_pushed_iface==ee) && (iep->button[ee].pushpic>0))
           pic=iep->button[ee].pushpic;
         else if (iep->button[ee].overpic>0)
           pic=iep->button[ee].overpic;
       }
     }
-    wputblock(tdxp,tdyp,images[pic],0);
-    if ((iep->button[ee].flags==0) | (play.disabled_user_interface>0)) {
-      int wid,hit;
-      for (wid=0;wid<images[pic]->w;wid++) { // grid pattern
-        for (hit=wid%2;hit<images[pic]->h;hit+=2)
-          _putpixel(abuf,tdxp+wid,tdyp+hit,16);
+    if ((iep->button[ee].flags & IBFLG_INVBOX)!=0) {
+      if (play.inv_numdisp==0) {
+        play.inv_numinline=iep->button[ee].leftclick/(sxmult*40);
+        play.inv_numdisp=play.inv_numinline*(iep->button[ee].rightclick/(symult*22));
+      }
+      if (play.inv_numorder<0) update_invorder();
+      // draw the items
+      int uu,cxp=tdxp,cyp=tdyp;
+      for (uu=play.inv_top;uu<play.inv_numorder;uu++) {
+        if (uu>=play.inv_top+play.inv_numdisp) break;
+        // draw inv graphic
+        wputblock(cxp,cyp,images[game.invinfo[play.inv_order[uu]].pic],0);
+        cxp+=sxmult*40;
+        // go to next row when appropriate
+        if ((uu-play.inv_top) % play.inv_numinline==(play.inv_numinline-1)) {
+          cxp=tdxp;
+          cyp+=symult*22;
+        }
+      }
+    } else {
+      wputblock(tdxp,tdyp,images[pic],0);
+      if (((iep->button[ee].flags & IBFLG_ENABLED)==0) | (play.disabled_user_interface>0)) {
+        int wid,hit;
+        for (wid=0;wid<images[pic]->w;wid++) { // grid pattern
+          for (hit=wid%2;hit<images[pic]->h;hit+=2)
+            _putpixel(abuf,tdxp+wid,tdyp+hit,16);
+        }
       }
     }
   }
@@ -1340,72 +1439,78 @@ void draw_screen_background() {
   }
   wputblock(-offsetx,-offsety,thisroom.bscene,0);
   clear_sprite_list();
-  // draw objects
-  for (aa=0;aa<croom->numobj;aa++) {
-    if (objs[aa].on==0) continue;
-    int useindx=aa;
-    if (actsps[useindx]!=NULL) wfreeblock(actsps[useindx]);
-    atxp=objs[aa].x*sxmult-offsetx;
-    atyp=objs[aa].y*symult-spriteheight[objs[aa].num]-offsety;
-    actsps[useindx]=wallocblock(spritewidth[objs[aa].num],spriteheight[objs[aa].num]);
-    clear(actsps[useindx]);
-    draw_sprite(actsps[useindx],images[objs[aa].num],0,0);
-    sort_out_walk_behinds(actsps[useindx],atxp+offsetx,atyp+offsety,objs[aa].y);
-    add_to_sprite_list(actsps[useindx],atxp,atyp,(thisroom.objbaseline[aa]<1)?objs[aa].y:thisroom.objbaseline[aa]);
-  }
-  // draw characters
-  for (aa=0;aa<game.numcharacters;aa++) {
-    if (game.chars[aa].on==0) continue;
-    if (game.chars[aa].room!=displayed_room) continue;
-    int useindx=aa+MAX_INIT_SPR;
-    if (actsps[useindx]!=NULL) wfreeblock(actsps[useindx]);
-    CharacterInfo*chin=&game.chars[aa];
-    sppic=views[chin->view].frames[chin->loop][chin->frame].pic;
-    onarea=getpixel(thisroom.walls,chin->x,chin->y);
-    if (onarea==0) {
-      // the path finder sometimes slightly goes into non-walkable areas;
-      // so check for scaling in adjacent pixels
-      const int TRYGAP=2;
-      onarea=getpixel(thisroom.walls,chin->x+2,chin->y);
-      if (onarea==0) onarea=getpixel(thisroom.walls,chin->x-2,chin->y);
-      if (onarea==0) onarea=getpixel(thisroom.walls,chin->x,chin->y+2);
-      if (onarea==0) onarea=getpixel(thisroom.walls,chin->x,chin->y-2);
-    }
-    zoom_level=100;
-    if (chin->flags & CHF_MANUALSCALING) ;
-    else if ((onarea>=0) & (onarea<MAX_WALK_AREAS)) {
-      zoom_level=thisroom.walk_area_zoom[onarea]+100;
-    }
-    if (zoom_level!=100) {
-      // it needs to be stretched, so calculate the new dimensions
-      widd=(spritewidth[sppic]*zoom_level)/100;
-      hitt=(spriteheight[sppic]*zoom_level)/100;
-      atxp=(chin->x*sxmult)-offsetx-(widd/2);
-      atyp=(chin->y*symult)-hitt-offsety;
-      actsps[useindx]=wallocblock(widd,hitt);
+  if ((debug_flags & DBG_NOOBJECTS)==0) {
+    // draw objects
+    for (aa=0;aa<croom->numobj;aa++) {
+      if (objs[aa].on==0) continue;
+      int useindx=aa;
+      if (actsps[useindx]!=NULL) wfreeblock(actsps[useindx]);
+      atxp=objs[aa].x*sxmult-offsetx;
+      atyp=objs[aa].y*symult-spriteheight[objs[aa].num]-offsety;
+      actsps[useindx]=wallocblock(spritewidth[objs[aa].num],spriteheight[objs[aa].num]);
       clear(actsps[useindx]);
-      stretch_sprite(actsps[useindx],images[sppic],0,0,widd,hitt);
-      sort_out_walk_behinds(actsps[useindx],atxp+offsetx,atyp+offsety,chin->y);
+      draw_sprite(actsps[useindx],images[objs[aa].num],0,0);
+      sort_out_walk_behinds(actsps[useindx],atxp+offsetx,atyp+offsety,objs[aa].y);
+      add_to_sprite_list(actsps[useindx],atxp,atyp,(thisroom.objbaseline[aa]<1)?objs[aa].y:thisroom.objbaseline[aa]);
     }
-    else {
-      // draw at original size, so just use the sprite width and height
-      atxp=(chin->x*sxmult)-offsetx-(spritewidth[sppic]/2);
-      atyp=(chin->y*symult)-spriteheight[sppic]-offsety;
-      actsps[useindx]=wallocblock(spritewidth[sppic],spriteheight[sppic]);
-      clear(actsps[useindx]);
-      draw_sprite(actsps[useindx],images[sppic],0,0);
-      sort_out_walk_behinds(actsps[useindx],atxp+offsetx,atyp+offsety,chin->y);
+    // draw characters
+    for (aa=0;aa<game.numcharacters;aa++) {
+      if (game.chars[aa].on==0) continue;
+      if (game.chars[aa].room!=displayed_room) continue;
+      int useindx=aa+MAX_INIT_SPR;
+      if (actsps[useindx]!=NULL) wfreeblock(actsps[useindx]);
+      CharacterInfo*chin=&game.chars[aa];
+      sppic=views[chin->view].frames[chin->loop][chin->frame].pic;
+      onarea=getpixel(thisroom.walls,chin->x,chin->y);
+      if (onarea==0) {
+        // the path finder sometimes slightly goes into non-walkable areas;
+        // so check for scaling in adjacent pixels
+        const int TRYGAP=2;
+        onarea=getpixel(thisroom.walls,chin->x+2,chin->y);
+        if (onarea==0) onarea=getpixel(thisroom.walls,chin->x-2,chin->y);
+        if (onarea==0) onarea=getpixel(thisroom.walls,chin->x,chin->y+2);
+        if (onarea==0) onarea=getpixel(thisroom.walls,chin->x,chin->y-2);
+      }
+      zoom_level=100;
+      if (chin->flags & CHF_MANUALSCALING) ;
+      else if ((onarea>=0) & (onarea<MAX_WALK_AREAS)) {
+        zoom_level=thisroom.walk_area_zoom[onarea]+100;
+      }
+      if (zoom_level!=100) {
+        // it needs to be stretched, so calculate the new dimensions
+        widd=(spritewidth[sppic]*zoom_level)/100;
+        hitt=(spriteheight[sppic]*zoom_level)/100;
+        atxp=(chin->x*sxmult)-offsetx-(widd/2);
+        atyp=(chin->y*symult)-hitt-offsety;
+        actsps[useindx]=wallocblock(widd,hitt);
+        clear(actsps[useindx]);
+        stretch_sprite(actsps[useindx],images[sppic],0,0,widd,hitt);
+        sort_out_walk_behinds(actsps[useindx],atxp+offsetx,atyp+offsety,chin->y);
+      }
+      else {
+        // draw at original size, so just use the sprite width and height
+        atxp=(chin->x*sxmult)-offsetx-(spritewidth[sppic]/2);
+        atyp=(chin->y*symult)-spriteheight[sppic]-offsety;
+        actsps[useindx]=wallocblock(spritewidth[sppic],spriteheight[sppic]);
+        clear(actsps[useindx]);
+        draw_sprite(actsps[useindx],images[sppic],0,0);
+        sort_out_walk_behinds(actsps[useindx],atxp+offsetx,atyp+offsety,chin->y);
+      }
+      add_to_sprite_list(actsps[useindx],atxp,atyp,chin->y);
+      chin->actx=atxp+offsetx;
+      chin->acty=atyp+offsety;
     }
-    add_to_sprite_list(actsps[useindx],atxp,atyp,chin->y);
-    chin->actx=atxp+offsetx;
-    chin->acty=atyp+offsety;
+    if ((debug_flags & DBG_NODRAWSPRITES)==0) {
+      draw_sprite_list();
+    }
   }
-  draw_sprite_list();
   // draw interfaces
   mouse_on_iface_button=-1;
-  for (aa=0;aa<game.numiface;aa++) {
-    if (game.iface[aa].popup==POPUP_MOUSEY) continue;
-    draw_interface(&game.iface[aa],aa);
+  if ((debug_flags & DBG_NOIFACE)==0) {
+    for (aa=0;aa<game.numiface;aa++) {
+      if (game.iface[aa].popup==POPUP_MOUSEY) continue;
+      draw_interface(&game.iface[aa],aa);
+    }
   }
 }
 
@@ -1460,8 +1565,10 @@ void update_screen() {
 void atexit_handler() {
   if (proper_exit==0) {
     printf("\nError: the program has exited without requesting it.\n"
+      "Program pointer: %+03d  (write t his number down)\n"
       "If you see a list of numbers above, please write them down and contact\n"
-      "Chris Jones. Otherwise, note down any other information displayed.\n");
+      "Chris Jones. Otherwise, note down any other information displayed.\n",
+      our_eip);
   }
 }
 
@@ -1614,6 +1721,8 @@ int load_game_file() {
   for (ee=0;ee<game.numfonts;ee++) {
     sprintf(filnm,"agsfnt%d.wfn",ee);
     fonts[ee]=wloadfont(filnm);
+    // actual font not found, try font 0 instead
+    if (fonts[ee]==NULL) fonts[ee]=wloadfont("agsfnt0.wfn");
   }
   usetup.textheight=wgettextheight("ZHwypqhkilIK",fonts[0])+1;
 
@@ -2051,6 +2160,7 @@ void play_audio_clip_by_index(int indx) {
     newmusic(indx-1000);
     return;
   }
+  if ((debug_flags & DBG_NOSFX)!=0) return;
   char sndnam[20];
   sprintf(sndnam,"sound%d.wav",indx);
   PACKFILE*sndfil=pack_fopen(sndnam,"rb");
@@ -2066,6 +2176,7 @@ void add_inventory(int inum) {
   if ((inum<0) | (inum>=MAX_INV))
     quit("!AddInventory: invalid invnetory number");
   playerchar->inv[inum]++;
+  update_invorder();
 }
 
 void RunDialog(int tum) {
@@ -2092,6 +2203,7 @@ void run_event_block(EventBlock*evpt,int evnt,int invnum) {
         if (GetCursorMode()==MODE_USE)
           set_cursor_mode(MODE_WALK);
       }
+      update_invorder();
     }
     if (evpt->score[ee]!=0) {
       GiveScore(evpt->score[ee]);
@@ -2259,6 +2371,13 @@ void ProcessClick(int xx,int yy,int mood) {
   xx+=offsetx/sxmult;
   yy+=offsety/symult;
   if (mood==MODE_WALK) {
+    int hsnum=getpixel(thisroom.lookat,xx,yy);
+    if (hsnum<1) ;
+    else if (thisroom.hswalkto[hsnum].x<1) ;
+    else {
+      xx=thisroom.hswalkto[hsnum].x;
+      yy=thisroom.hswalkto[hsnum].y;
+    }
     walk_character(game.playercharacter,xx,yy,0,0);
     return;
   }
@@ -2288,34 +2407,35 @@ int do_movelist_move(short*mlnum,int*xx,int*yy) {
   int need_to_fix_sprite=0;
   if (mlnum[0]<1) quit("movelist_move: attempted to move on a non-exist movelist");
   MoveList*cmls; cmls=&mls[mlnum[0]];
+  fixed xpermove=cmls->xpermove[cmls->onstage],ypermove=cmls->ypermove[cmls->onstage];
 
   int xps=xx[0],yps=yy[0];
   if (cmls->doneflag & 1) {
     // if the X-movement has finished, and the Y-per-move is < 1, finish
     // This can cause jump at the end, but without it the character will
     // walk on the spot for a while if the Y-per-move is for example 0.2
-    int ypmm=(cmls->ypermove[cmls->onstage] >> 16) & 0x0000ffff;
+    int ypmm=(ypermove >> 16) & 0x0000ffff;
     if ((ypmm==0) | (ypmm==0xffff)) cmls->doneflag|=2;
   }
-  else xps=cmls->fromx+(int)(fixtof(cmls->xpermove[cmls->onstage])*(float)cmls->onpart);
+  else xps=cmls->fromx+(int)(fixtof(xpermove)*(float)cmls->onpart);
 
   if (cmls->doneflag & 2) {
     // Y-movement has finished
-    int xpmm=(cmls->xpermove[cmls->onstage] >> 16) & 0x0000ffff;
+    int xpmm=(xpermove >> 16) & 0x0000ffff;
     if ((xpmm==0) | (xpmm==0xffff)) cmls->doneflag|=1;
   }
-  else yps=cmls->fromy+(int)(fixtof(cmls->ypermove[cmls->onstage])*(float)cmls->onpart);
+  else yps=cmls->fromy+(int)(fixtof(ypermove)*(float)cmls->onpart);
 
   // check if finished horizontal movement
-  if ((cmls->xpermove[cmls->onstage]>0) & (xps>=(cmls->pos[cmls->onstage+1] >> 16)))
+  if ((xpermove>0) & (xps>=(cmls->pos[cmls->onstage+1] >> 16)))
     cmls->doneflag|=1;
-  else if ((cmls->xpermove[cmls->onstage]<0) & (xps<=(cmls->pos[cmls->onstage+1] >> 16)))
+  else if ((xpermove<0) & (xps<=(cmls->pos[cmls->onstage+1] >> 16)))
     cmls->doneflag|=1;
 
   // check if finished vertical movement
-  if ((cmls->ypermove[cmls->onstage]>0) & (yps>=(cmls->pos[cmls->onstage+1] & 0x00ffff)))
+  if ((ypermove>0) & (yps>=(cmls->pos[cmls->onstage+1] & 0x00ffff)))
     cmls->doneflag|=2;
-  else if ((cmls->ypermove[cmls->onstage]<0) & (yps<=(cmls->pos[cmls->onstage+1] & 0x00ffff)))
+  else if ((ypermove<0) & (yps<=(cmls->pos[cmls->onstage+1] & 0x00ffff)))
     cmls->doneflag|=2;
 
   if (cmls->xpermove[cmls->onstage]==0)
@@ -2372,6 +2492,7 @@ void update_music_volume() {
 }
 
 void newmusic(int mnum) {
+  if ((debug_flags & DBG_NOMUSIC)!=0) return;
   if (mnum<0) {
     stopmusic();
     return;
@@ -2550,6 +2671,15 @@ void GiveScore(int amnt) {
 }
 
 void GetLocationName(int xxx,int yyy,char*tempo) {
+  if (mouse_on_iface>=0) {
+    tempo[0]=0;
+    if ((mouse_on_iface_button>=0) && (game.iface[mouse_on_iface].button[mouse_on_iface_button].flags & IBFLG_INVBOX)!=0) {
+      int mover=offset_over_inv();
+      if (mover<0) return;
+      strcpy(tempo,game.invinfo[mover].name);
+    }
+    return;
+  }
   xxx+=offsetx/sxmult;
   yyy+=offsety/symult;
   if ((xxx>=thisroom.width) | (xxx<0) | (yyy<0) | (yyy>=thisroom.height)) {
@@ -2574,6 +2704,11 @@ void GetLocationName(int xxx,int yyy,char*tempo) {
   }
   onhs=getpixel(thisroom.lookat,xxx,yyy);
   if (onhs>0) strcpy(tempo,thisroom.hotspotnames[onhs]);
+}
+
+void GetInvName(int indx,char*buff) {
+  if ((indx<0) | (indx>=game.numinvitems)) quit("!GetInvName: invalid inventory item specified");
+  strcpy(buff,game.invinfo[indx].name);
 }
 
 void MoveCharacter(int cc,int xx,int yy) {
@@ -2659,6 +2794,7 @@ void script_debug(int cmdd) {
   if (cmdd==0) {
     for (rr=0;rr<game.numinvitems;rr++)
       playerchar->inv[rr]=1;
+    update_invorder();
   }
   else if (cmdd==1) {
     Display("Adventure Game Studio run-time engine[ACI version " ACI_VERSION_TEXT
@@ -2715,6 +2851,15 @@ int cd_player_control(int cmdd,int datt) {
   }
   else quit("!CDAudio: Unknown command code");
   return 0;
+}
+
+void _sc_strcat(char*s1,char*s2) {
+  int MAXSTRLEN=MAX_MAXSTRLEN;
+  if (((long)&s1[0]>(long)&game.iface[0]) && ((long)&s1[0]<(long)&game.iface[10+1]))
+    MAXSTRLEN=40;
+  int mosttocopy=(MAXSTRLEN-strlen(s1))-1;
+  strncpy(&s1[strlen(s1)],s2,mosttocopy);
+  s1[MAXSTRLEN-1]=0;
 }
 
 int get_graph_variable(int indx) {
@@ -2814,6 +2959,7 @@ int run_graph_commandlist(int ct) {
         playerchar->inv[gse->_using]--;
         if ((playerchar->activeinv==gse->_using) & (playerchar->inv[gse->_using]<1))
           playerchar->activeinv=-1;
+        update_invorder();
         break;
       case 13: // stop script
         return 0;
@@ -3068,6 +3214,9 @@ void save_game(int slotn,char*descript) {
   fwrite(&palette[0],sizeof(color),256,ooo);
   for (bb=0;bb<game.numdialog;bb++)
     fwrite(&dialog[bb].optionflags[0],sizeof(int),MAXTOPICOPTIONS,ooo);
+  putw(mouse_on_iface,ooo);
+  putw(mouse_on_iface_button,ooo);
+  putw(mouse_pushed_iface,ooo);
   fclose(ooo);
 }
 
@@ -3165,6 +3314,9 @@ int load_game(int slotn) {
   fread(&palette[0],sizeof(color),256,ooo);
   for (vv=0;vv<game.numdialog;vv++)
     fread(&dialog[vv].optionflags[0],sizeof(int),MAXTOPICOPTIONS,ooo);
+  mouse_on_iface=getw(ooo);
+  mouse_on_iface_button=getw(ooo);
+  mouse_pushed_iface=getw(ooo);
   fclose(ooo);
   int curwas=cur_cursor;
   set_cursor_mode(cur_mode);
@@ -3174,16 +3326,6 @@ int load_game(int slotn) {
   play.gscript_timer=gstimer;
   in_new_room=3;
   return 0;
-}
-
-void run_event_block_inv(EventBlock*evpt,int evnt,int invn=-1) {
-  domouse(2);
-  abuf=virtual_screen;
-  wputblock(0,0,screen,0);
-  evblockbasename="inventory%d";
-  run_event_block(evpt,evnt,invn);
-  abuf=screen;
-  domouse(1);
 }
 
 #define ICONSPERLINE 4
@@ -3264,6 +3406,7 @@ start_actinv:
           }
         else if (cmode==MODE_USE) {
           // use objects on each other
+          play.usedinv=toret;
           run_event_block_inv(&game.invcond[dii[clickedon].num],3,toret);
           domouse(2);
           goto start_actinv;
@@ -3347,6 +3490,7 @@ void setup_script_exports() {
   scAdd_External_Symbol("FileRead",(void *)FileRead);
   scAdd_External_Symbol("FileWrite",(void *)FileWrite);
   scAdd_External_Symbol("GetCursorMode",(void *)GetCursorMode);
+  scAdd_External_Symbol("GetInvName",(void *)GetInvName);
   scAdd_External_Symbol("GetLanguageString",(void *)GetLanguageString);
   scAdd_External_Symbol("GetLocationName",(void *)GetLocationName);
   scAdd_External_Symbol("GetPlayerCharacter",(void *)GetPlayerCharacter);
@@ -3383,7 +3527,7 @@ void setup_script_exports() {
   scAdd_External_Symbol("SetPalRGB",(void *)SetPalRGB);
   scAdd_External_Symbol("SetPlayerCharacter",(void *)SetPlayerCharacter);
   scAdd_External_Symbol("StopMoving",(void *)StopMoving);
-  scAdd_External_Symbol("StrCat",(void *)strcat);
+  scAdd_External_Symbol("StrCat",(void *)_sc_strcat);
   scAdd_External_Symbol("StrComp",(void *)strcmp);
   scAdd_External_Symbol("StrCopy",(void *)strcpy);
   scAdd_External_Symbol("StrLen",(void *)strlen);
@@ -3395,6 +3539,7 @@ void setup_script_exports() {
 }
 
 void mainloop() {
+  our_eip=1;
   timerloop=0;
   setevent(EV_TEXTSCRIPT,TS_REPEAT);
   setevent(EV_RUNEVBLOCK,EVB_ROOM,0,6);
@@ -3407,8 +3552,11 @@ void mainloop() {
   // run Stands on Hotspot event
   setevent(EV_RUNEVBLOCK,EVB_HOTSPOT,onhs,0);
   check_controls();
-  if (game_paused==0) update_stuff();
+  our_eip=2;
+  if ((debug_flags & DBG_NOUPDATE)!=0) ;
+  else if (game_paused==0) update_stuff();
   mouse_on_iface=-1;
+  our_eip=3;
   draw_screen_background();
   if (libamp_loaded!=0) {
     if (amp_decode()<0) {
@@ -3416,8 +3564,11 @@ void mainloop() {
       libamp_loaded=0;
     }
   }
+  our_eip=4;
   draw_topbar();
+  our_eip=5;
   update_screen();
+  our_eip=6;
   if (in_new_room>0) {
     setevent(EV_FADEIN,0,0,0);
     if (in_new_room==2)  // first time enters screen
@@ -3426,6 +3577,7 @@ void mainloop() {
   in_new_room=0;
   processallevents(numevents,event);
   numevents=0;
+  our_eip=7;
   poll_mp3();
   gettime(&t2);
   loopcounter++;
@@ -3529,6 +3681,16 @@ int main(int argc,char**argv)
          "ACI version " ACI_VERSION_TEXT "\n");
   if ((argc>1) && (argv[1][1]=='?'))
     return 0;
+  debug_flags=0;
+  for (ee=1;ee<argc;ee++) {
+    if (argv[ee][1]=='?') return 0;
+    if (stricmp(argv[ee],"-noiface")==0) debug_flags|=DBG_NOIFACE;
+    else if (stricmp(argv[ee],"-nosprdisp")==0) debug_flags|=DBG_NODRAWSPRITES;
+    else if (stricmp(argv[ee],"-nospr")==0) debug_flags|=DBG_NOOBJECTS;
+    else if (stricmp(argv[ee],"-noupdate")==0) debug_flags|=DBG_NOUPDATE;
+    else if (stricmp(argv[ee],"-nosound")==0) debug_flags|=DBG_NOSFX;
+    else if (stricmp(argv[ee],"-nomusic")==0) debug_flags|=DBG_NOMUSIC;
+  }
   strcpy(conffilebuf,argv[0]);
   for (ee=0;ee<strlen(conffilebuf);ee++) {
     if (conffilebuf[ee]=='/') conffilebuf[ee]='\\';
@@ -3558,6 +3720,7 @@ int main(int argc,char**argv)
     }
     return 8;
   }
+  allegro_init();
   if (init_cd_player()==0) {
     printf("CD-ROM Audio support enabled.\n");
   }
@@ -3604,7 +3767,6 @@ int main(int argc,char**argv)
     roomstats[ee].tsdata=NULL;
     }
   printf("Checking sound inits.\n");
-  allegro_init();
   if (usetup.mod_player) reserve_voices(NUM_MOD_DIGI_VOICES+2,-1);
   if (install_sound(usetup.digicard,usetup.midicard,NULL)!=0) {
     reserve_voices(-1,-1);
@@ -3621,6 +3783,17 @@ int main(int argc,char**argv)
     if (usetup.mp3_player==0) ;
     else install_amp();
   }
+  if (debug_flags>0) {
+    printf("Engine debugging enabled.\n");
+    printf("\nNOTE: You have selected to enable one or more engine debugging options.\n");
+    printf("These options cause many parts of the game to behave abnormally, and you\n");
+    printf("may not see the game as you are used to it. The point is to test whether\n");
+    printf("the engine passes a point where it is crashing on you normally.\n");
+    printf("[Debug flags enabled: 0x%02X]\n",debug_flags);
+    printf("Press a key to continue.\n");
+    getch();
+  }
+  our_eip=-10;
   atexit(atexit_handler);
   srand(time(NULL) % 2000);
   init_pathfinder();
@@ -3656,6 +3829,7 @@ int main(int argc,char**argv)
     clear(screen);
     screen=create_sub_bitmap(_old_screen,32,84,960,600);
   }
+  our_eip=-9;
   block splashsc=load_pcx("preload.pcx",temppal);
   if (splashsc!=NULL) {
     wsetpalette(0,255,temppal);
@@ -3683,22 +3857,7 @@ int main(int argc,char**argv)
       return 5;
     }
   }
-  for (ee=0;ee<MAX_SPRITES;ee++) {
-    if (images[ee]==NULL) {
-      spritewidth[ee]=0;
-      spriteheight[ee]=0;
-      continue;
-    }
-    else {
-      block tmpdbl=create_bitmap(images[ee]->w*sxmult,images[ee]->h*symult);
-      clear(tmpdbl);
-      stretch_sprite(tmpdbl,images[ee],0,0,tmpdbl->w,tmpdbl->h);
-      destroy_bitmap(images[ee]);
-      images[ee]=tmpdbl;
-      spritewidth[ee]=images[ee]->w;
-      spriteheight[ee]=images[ee]->h;
-    }
-  }
+  our_eip=-8;
   for (ee=0;ee<MAX_INIT_SPR+MAX_CHARACTERS;ee++) {
     actsps[ee]=NULL;
   }
@@ -3718,6 +3877,35 @@ int main(int argc,char**argv)
       printf("Script link failed [error %d]\n-- %s --)\n",scErrorNo,scErrorMsg);
     return 6;
   }
+  our_eip=-7;
+  for (ee=0;ee<MAX_SPRITES;ee++) {
+    if (images[ee]==NULL) {
+      spritewidth[ee]=0;
+      spriteheight[ee]=0;
+      continue;
+    }
+    else {
+      int newwid=images[ee]->w*sxmult;
+      int newhit=images[ee]->h*symult;
+      if ((game.spriteflags[ee] & SPF_640x400)!=0) {
+        if (sxmult==2) {
+          newwid=images[ee]->w;
+          newhit=images[ee]->h;
+        } else {
+          newwid=(images[ee]->w/2)*sxmult;
+          newhit=(images[ee]->h/2)*symult;
+        }
+      }
+      block tmpdbl=create_bitmap(newwid,newhit);
+      clear(tmpdbl);
+      stretch_sprite(tmpdbl,images[ee],0,0,tmpdbl->w,tmpdbl->h);
+      destroy_bitmap(images[ee]);
+      images[ee]=tmpdbl;
+      spritewidth[ee]=images[ee]->w;
+      spriteheight[ee]=images[ee]->h;
+    }
+  }
+  our_eip=-6;
   init_language_text(game.langcodes[0]);
   for (ee=0;ee<256;ee++) {
     if (game.paluses[ee]!=PAL_BACKGROUND) palette[ee]=game.defpal[ee];
@@ -3737,12 +3925,17 @@ int main(int argc,char**argv)
     for (bb=0;bb<iep->numbuttons;bb++) {
       iep->button[bb].x*=sxmult;
       iep->button[bb].y*=symult;
+      if ((iep->button[bb].flags & IBFLG_INVBOX)!=0) {
+        iep->button[bb].leftclick*=sxmult;
+        iep->button[bb].rightclick*=symult;
+      }
     }
   }
   for (ee=0;ee<MAX_CURSOR;ee++) {
     game.mcurs[ee].hotx*=sxmult;
     game.mcurs[ee].hoty*=symult;
   }
+  our_eip=-5;
   for (ee=0;ee<game.numinvitems;ee++) {
     if (game.invinfo[ee].flags & IFLG_STARTWITH) playerchar->inv[ee]=1;
     else playerchar->inv[ee]=0;
@@ -3752,17 +3945,22 @@ int main(int argc,char**argv)
   play.disabled_user_interface=0;
   play.gscript_timer=-1;
   play.debug_mode=game.options[OPT_DEBUGMODE];
+  play.inv_top=0;
+  play.inv_numdisp=0;
+  play.inv_numorder=-1;
   scsystem.width=scrnwid;
   scsystem.height=scrnhit;
   scsystem.coldepth=8;
   scsystem.os=1;
   mousecurs[0]=images[2054];
   currentcursor=0;
+  our_eip=-4;
   set_cursor_mode(MODE_WALK);
   mgraphconfine(0,0,319,199);
   wsetscreen(virtual_screen);
   newmusic(0);
   run_text_script(gameinst,"game_start");
+  our_eip=-3;
   new_room(playerchar->room,playerchar);
   gettime(&t1);
   lastcounter=0;

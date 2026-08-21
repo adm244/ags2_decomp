@@ -1,6 +1,4 @@
 DONE:
-
-TODO:
 vga256
 wsetmode
 wgetmode
@@ -15,7 +13,7 @@ wloadblock
 wloadsprites
 wfreesprites
 wsavesprites
-wloadfont
+(*) wloadfont
 wtextbackground
 wtexttransparent
 printchar
@@ -92,29 +90,29 @@ set_mouse_cursor
 set_default_cursor
 find_next_enabled_cursor
 set_cursor_mode
-enable_cursor_mode
-disable_cursor_mode
+(*) enable_cursor_mode
+(*) disable_cursor_mode
 remove_popup_interface
 process_interface_click
-offset_over_inv
-run_event_block_inv
-check_controls
+(*) offset_over_inv
+(*) run_event_block_inv
+(*) check_controls
 fix_player_sprite
 update_stuff
 printtext
-update_invorder
-draw_interface
+(*) update_invorder
+(*) draw_interface
 sort_out_walk_behinds
 clear_sprite_list
 add_to_sprite_list
 draw_sprite_list
-draw_screen_background
+(*) draw_screen_background
 draw_topbar
 update_screen
-atexit_handler
+(*) atexit_handler
 quit
 setup_sierra_interface
-load_game_file
+(*) load_game_file
 poll_mp3
 do_corner
 draw_button_background
@@ -139,21 +137,21 @@ make_ts_func_name
 fli_callback
 play_flc_file
 play_sound
-play_audio_clip_by_index
-add_inventory
+(*) play_audio_clip_by_index
+(*) add_inventory
 RunDialog
-run_event_block
+(*) run_event_block
 isposinbox
 check_click_on_object
 is_pos_on_character
 check_click_on_character
 break_out_seer
 walk_character
-ProcessClick
-do_movelist_move
+(*) ProcessClick
+(*) do_movelist_move
 stopmusic
 update_music_volume
-newmusic
+(*) newmusic
 SetPlayerCharacter
 QuitGame
 FileOpen
@@ -173,8 +171,8 @@ __Rand
 RefreshMouse
 GetCursorMode
 GiveScore
-GetLocationName
-GetInvName
+(*) GetLocationName
+(*) GetInvName
 MoveCharacter
 GetPlayerCharacter
 SetCharacterView
@@ -185,30 +183,30 @@ MoveCharacterToObject
 MoveCharacterToHotspot
 StopMoving
 GetLanguageString
-script_debug
+(*) script_debug
 cd_player_control
-_sc_strcat
+(*) _sc_strcat
 get_graph_variable
 set_graph_variable
-run_graph_commandlist
+(*) run_graph_commandlist
 fget_long
 run_graph_script
 run_dialog_request
 do_conversation
 find_highest_room_entered
-save_game
-load_game
-__actual_invscreen
+(*) save_game
+(*) load_game
+(*) __actual_invscreen
 invscreen
 sc_invscreen
-setup_script_exports
-mainloop
+(*) setup_script_exports
+(*) mainloop
 check_write_access
 run_setup
 main_game_loop
 do_main_cycle
 init_cd_player
-main
+(*) main
 GameStruct
 is_valid_character
 is_valid_object
@@ -233,7 +231,7 @@ CSCIWaitMessage
 CSCICreateControl
 CSCIDeleteControl
 CSCISendControlMessage
-preparesavegamelist
+(*) preparesavegamelist
 loadgamedialog
 enternumberwindow
 savegamedialog
@@ -298,7 +296,7 @@ CD_DEVINFO
 csetlib
 clibfilesize
 cliboffset
-clibfopen
+(*) clibfopen
 insert
 _delete
 lzwcompress

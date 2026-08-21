@@ -758,6 +758,10 @@ void preparesavegamelist(int ctrllist)
       toomanygames=1;
       break;
     }
+    if (strstr(ffb.ff_name,"999")!=NULL) {
+      don=findnext(&ffb);
+      continue;
+    }
     // get description
     ooo=fopen(ffb.ff_name,"rb");
     fseek(ooo,sgsiglen,SEEK_CUR);

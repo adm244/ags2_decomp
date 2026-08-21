@@ -223,6 +223,7 @@ struct PolyPoints {
 #define IBACT_SETMODE   1
 #define IBACT_SCRIPT    2
 #define IBFLG_ENABLED   1
+#define IBFLG_INVBOX    2
 struct InterfaceButton {
   int x, y, pic, overpic, pushpic, leftclick;
   int rightclick; // if inv, then leftclick = wid, rightclick = hit
@@ -1071,6 +1072,8 @@ struct DialogTopic {
 #define OPT_ANTIGLIDE       4
 #define OPT_TWCUSTOM        5
 #define OPT_DIALOGGAP       6
+#define OPT_NOSKIPTEXT      7
+#define SPF_640x400         1
 
 struct OriGameStruct {
   char              gamename[30];
