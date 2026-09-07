@@ -1,6 +1,7 @@
 # Adventure Game Studio 2.02
 
-September 1999
+Build: 2.02.035\
+Date: 2 October 1999 at 16:49:08
 
 - DJGPP: 2.0.1 (October 31 1996 by GCC 2.7.2.1) (Walnut Creek CDROM August 1998)
 - GCC: 2.8.x(?) (decided to go with 2.8.1)
