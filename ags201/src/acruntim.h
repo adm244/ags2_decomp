@@ -121,8 +121,6 @@ struct GameState {
 #define UNTIL_INTISNEG  8
 #define MANOBJNUM 99
 
-#define STD_BUFFER_SIZE 300
-
 #define MAXLINE 15
 
 extern GameStruct game;

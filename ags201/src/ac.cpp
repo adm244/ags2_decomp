@@ -1805,7 +1805,7 @@ void _display_at(int xx,int yy,int wii,char*todis,int blocking,int asspch) {
 }
 
 void DisplayAt(int xxp,int yyp,int widd,char*texx, ...) {
-  char displbuf[STD_BUFFER_SIZE];
+  char displbuf[300];
   va_list ap;
   va_start(ap,texx);
   vsprintf(displbuf,texx,ap);
@@ -1819,7 +1819,7 @@ void DisplayAt(int xxp,int yyp,int widd,char*texx, ...) {
   }
 
 void Display(char*texx, ...) {
-  char displbuf[STD_BUFFER_SIZE];
+  char displbuf[300];
   va_list ap;
   va_start(ap,texx);
   vsprintf(displbuf,texx,ap);
@@ -1910,7 +1910,7 @@ void EndCapture() {
 }
 
 void CapturedPrint(int xx,int yy,char*texx,...) {
-  char displbuf[STD_BUFFER_SIZE];
+  char displbuf[300];
   if (screen_state!=2)
     quit("!CapturedPrint: The screen is not currently captured.");
   xx*=sxmult; yy*=symult;
