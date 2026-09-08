@@ -1,0 +1,37 @@
+# truncated filenames to 8.3, DJGPP gcc refused to compile with LFN
+
+# ---- MS-DOS/pc ----
+
+DEFINES = -DNO_BYTE_SWAPPING -DOS_MSDOS -DARCH_i586
+CFLAGS = -O3 -ffast-math -Isrc -I../allegro
+WFLAGS =
+LDFLAGS =
+
+ifndef CROSS
+CFLAGS += -m486
+else
+WFLAGS += -Wno-aggressive-loop-optimizations
+endif
+
+ifdef DEBUG
+DEFINES += -DDEBUG
+CFLAGS += -g
+endif
+
+ifdef PROFILE
+LDFLAGS += -pg
+endif
+
+OBJ = dump.o formats.o getbits.o huffman.o layer3.o getdata.o misc2.o transfor.o \
+      audiolib.o audioalg.o position.o layer2.o rtbuf.o guicontr.o
+OBJS = $(addprefix obj/, $(OBJ))
+
+LIBS = -lalleg -lm
+
+all: lib/libamp.a
+
+lib/libamp.a: $(OBJS)
+	$(AR) rs lib/libamp.a $(OBJS)
+
+obj/%.o: src/%.c
+	$(CC) -c $(CFLAGS) $(WFLAGS) $(DEFINES) $(LDFLAGS) -o $@ $<

@@ -1,0 +1,207 @@
+#************************************************************************
+# SeeR a C-scripting library v 0.95a 
+# http://przemekp.prv.pl/seer/        dev@przemekp.prv.pl
+#             
+# File:makefile.all
+# Desc:does the dirty work - what makefile tells him
+#
+# Copyright (c) 1998-99,2002, Przemyslaw Podsiadly
+# All rights reserved.
+# See seer.h for license information.
+#************************************************************************
+.PHONY:delobj error
+#defines:
+#****Compilation options:
+#Optimize=1
+#PGCC=1
+#Compiler=1
+#Debug=1
+#Profile=1
+#Rebuild=1
+#SeeRC=1   make seerc.exe
+#Test=1    make test.exe
+# DEST_OS  LINUX,DOS,WIN32,FREEBSD,BEOS,UNIXWARE,SCOUNIX
+# DEST_CPU INTEL,ANY
+# DEST_CC  GCC,ANY
+# DEST_DIR - callasm.c, vcpudeco.h and other compiler-specific's are there
+# DEST_NASM - coff,elf
+
+ifndef DEST_OS
+badInit:;\
+@echo This makefile should be called from within system-specific makefile!
+endif
+
+# NAsm properties
+ifdef DEST_NASM
+ifeq ($(DEST_OS),DOS)
+NASM=nasm
+else
+NASM=/usr/local/bin/nasm
+endif
+NASM_FLAGS=-f $(DEST_NASM)
+#.asm.o:$(NASM) $(NASM_FLAGS) -o $@ $<
+endif
+
+ifdef Rebuild
+DoBefore=delobj
+#delobj:;@echo Deleting object files.
+else
+DoBefore=
+endif
+
+#only on Intel
+ifeq ($(DEST_CPU),INTEL)
+ifeq ($(DEST_OS),LINUX)
+#I've quite old Slackware with old gcc (without -m486).
+#You can try removing that (or changing to -mpentium)
+Machine=-m486
+else
+Machine=-mpentium
+endif
+else
+#no special machine specification for non-intel compatible
+Machine=
+endif
+
+ifdef CROSS
+Machine=
+endif
+
+#****output filename:
+
+#****library objs
+#OBJ_PATH=objs
+ifndef OBJ_PATH
+error:;@echo OBJ_PATH not set. Check your makefile!.
+endif
+OBJECTS=vars.o compiler.o expr.o declare.o initial.o parser.o preproc.o dict.o consts.o vcpucode.o vcpudeco.o \
+        instance.o callasm.o pmem.o script.o protect.o headers.o
+OBJs = $(addprefix $(OBJ_PATH)/, $(OBJECTS))
+
+#****program objs
+ifdef Compiler
+OBJp=seerc.o
+ifeq ($(DEST_OS),DOS)
+EXE=bin/seerc.exe
+else
+EXE=bin/seerc
+endif
+else
+OBJp=test.o
+ifeq ($(DEST_OS),DOS)
+EXE=test.exe
+else
+EXE=test
+endif
+endif
+
+ifdef Debug
+LIBc=lib/libseerd.a
+else
+LIBc=lib/libseer.a
+endif
+
+LIBs=-lm
+#-lalleg
+HDRs=seer.h src/internal.h src/code.h
+
+#****Compilation parameters
+ifdef Profile
+PRO=-pg
+else
+PRO=
+endif
+
+Optim=-O6
+
+ifdef Optimize
+  ifdef PGCC
+  FLAGS = -Wall -s $(Machine) $(Optim) -ffast-math -fomit-frame-pointer
+  SAFEFLAG= -Wall -s $(Machine) -O -ffast-math -fomit-frame-pointer
+  else
+  FLAGS=-Wall -s $(Machine) $(Optim) -ffast-math -fomit-frame-pointer
+  SAFEFLAGS=-Wall -s $(Machine) -O -ffast-math
+  endif
+LINK=-Wall -s
+else
+
+  ifdef Debug
+  FLAGS=-Wall -g $(Machine)
+  SAFEFLAGS=-Wall -g $(Machine)
+  LINK=-Wall -g $(Machine)
+  else
+   ifdef Profile
+   FLAGS=-Wall $(Machine)
+   SAFEFLAGS=-Wall $(Machine)
+   LINK=-Wall $(Machine)
+   else
+   FLAGS=-Wall -s $(Machine)
+   SAFEFLAGS=-Wall -s $(Machine)
+   LINK=-Wall -s $(Machine)
+   endif
+  endif
+
+endif
+
+ifdef Compiler
+MACROS = -DDEBUG -DSC_$(DEST_OS) -DSC_$(DEST_CC) -DSC_$(DEST_CPU)
+else
+ifdef Debug
+MACROS = -DDEBUG -DSC_$(DEST_OS) -DSC_$(DEST_CC) -DSC_$(DEST_CPU)
+else
+MACROS = -DSC_$(DEST_OS) -DSC_$(DEST_CC) -DSC_$(DEST_CPU)
+endif
+endif
+
+ifdef DEST_NASM
+MACROS += -DSC_NASM
+endif
+
+
+#****compiler and linker:
+AR=ar rs
+
+ifdef CROSS
+WFLAGS = -Wno-unused-but-set-variable -Wno-trigraphs
+FLAGS += $(WFLAGS)
+SAFEFLAGS += $(WFLAGS)
+else
+ifeq ($(DEST_CC),GCC)
+CC=gcc
+else
+CC=cc
+endif
+endif # CROSS
+
+FLAGS += -g
+
+all:$(LIBc)
+
+#****************************************************************
+#****link program:
+$(EXE):$(LIBc) msg2 $(OBJ_PATH)/$(OBJp) $(HDRs);$(CC) $(PRO) $(LINK) -o $(EXE) $(OBJ_PATH)/$(OBJp) $(LIBc) $(LIBs)
+
+#****link library:
+$(LIBc):$(DoBefore) $(OBJs) $(addprefix $(OBJ_PATH)/, $(DEST_ADD)) $(HDRs);$(AR) $(LIBc) $(OBJs) $(addprefix $(OBJ_PATH)/, $(DEST_ADD))
+
+
+#msg :;@echo Building SeeR scripting library
+msg2 :$(DoBefore);@echo Building SeeR $(EXE)
+
+#****compile
+
+#the callfunc comes from special location
+ifdef DEST_NASM
+$(OBJ_PATH)/callfunc.o:src/$(DEST_DIR)/callfunc.asm;$(NASM) $(NASM_FLAGS) -o $@ $<
+$(OBJ_PATH)/fixed.o:src/$(DEST_DIR)/fixed.asm;$(NASM) $(NASM_FLAGS) -o $@ $<
+endif
+$(OBJ_PATH)/callasm.o:src/callasm.c $(HDRs);$(CC) $(SAFEFLAGS) -c $(MACROS) $(PRO) -I. -o $@ $<
+
+
+$(OBJ_PATH)/%.o : src/%.c $(HDRs);$(CC) $(FLAGS) $(MACROS) $(PRO) -I. -c -o $@ $<
+
+ifeq ($(DEST_OS),DOS)
+delobj:;@del $(subst /,\,$(OBJ_PATH))\*.o
+else
+delobj:;@if [ "`ls $(OBJ_PATH)/*.o 2>/dev/nul`" != "" ]; then rm $(OBJ_PATH)/*.o; fi
+endif
