@@ -1079,7 +1079,7 @@ void update_stuff() {
       if ((chi->wait>0) & (game.options[OPT_ANTIGLIDE]>0)) ;
       else { walk=0;
         if (do_movelist_move(&chi->walking,&chi->x,&chi->y)==2) { walk++;
-          if (walk) chi->loop=fix_player_sprite(&mls[chi->walking]);
+          if (walk>0) chi->loop=fix_player_sprite(&mls[chi->walking]);
         }
       }
       if (chi->frame>views[chi->view].numframes[chi->loop])
@@ -2778,7 +2778,8 @@ int run_graph_commandlist(int ct) {
         MoveCharacterToObject(game.playercharacter,gse->_using);
         break;
       default:
-        char msg[54]; int tmp;
+        int val;
+        char msg[50]; int evnt;
         sprintf(msg,"run_graph_script: unknown evnt %d",(int)gse->type-1);
         quit(msg);
     }

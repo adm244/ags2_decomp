@@ -118,10 +118,6 @@ struct GameState {
 #define UNTIL_MOVEEND   2
 #define UNTIL_CHARIS0   3
 #define UNTIL_NOOVERLAY 4
-#define UNTIL_NEGATIVE  5
-#define UNTIL_INTIS0    6
-#define UNTIL_SHORTIS0  7
-#define UNTIL_INTISNEG  8
 #define MANOBJNUM 99
 
 #define MAXLINE 15
