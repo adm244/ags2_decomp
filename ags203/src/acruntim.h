@@ -9,11 +9,11 @@
 
 // This struct is only used in save games and by plugins
 struct RoomObject {
-  short x,y;
+  int   x,y;
   short num;            // sprite slot number
   short baseline;       // <=0 to use Y co-ordinate; >0 for specific baseline
   short view,loop,frame; // only used to track animation - 'num' holds the current sprite
-  short wait;
+  short wait,moving;
   char  cycling;        // is it currently animating?
   char  overall_speed;
   char  on;
@@ -118,6 +118,7 @@ struct GameState {
 #define UNTIL_MOVEEND   2
 #define UNTIL_CHARIS0   3
 #define UNTIL_NOOVERLAY 4
+#define UNTIL_NEGATIVE  5
 #define MANOBJNUM 99
 
 #define STD_BUFFER_SIZE 1000

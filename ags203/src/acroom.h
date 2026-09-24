@@ -330,16 +330,14 @@ struct roomstruct {
 #ifndef CROOM_NOFUNCTIONS
 int ff;
 void roomstruct::allocall() {
-//  printf("Before %ld\n",farcoreleft());
-  for (ff=0;ff<5;ff++) { backups[ff]=wnewblock(0,0,319,199);
-//    printf("%d ",ff); if (kbhit()) break;
-    if (backups[ff]==NULL) quit("ROOM.C, AllocMem: Out of memory"); }
-  walls=::backups[0];  // this is because blocks in a struct don't work
-  object=::backups[1]; // properly
-  lookat=::backups[2];
-  bscene=::backups[3];
-  shading=::backups[4];
-//  printf("After %ld\n",farcoreleft());
+  // These all get recreated when a room is loaded anyway
+  walls=create_bitmap(320,200);
+  object=create_bitmap(320,200);
+  lookat=create_bitmap(320,200);
+  bscene=create_bitmap(320,200);
+  shading=create_bitmap(320,200);
+  if (shading==NULL)
+    quit("roomstruct::allocall: out of memory");
   }
 
 void roomstruct::freemessage() {
@@ -459,10 +457,11 @@ long loadcompressed_allegro(FILE *fpp, BITMAP **bimpp, color *pall, long ooo) {
 }
 #endif
 
-#define BLOCKTYPE_MAIN       1
-#define BLOCKTYPE_SCRIPT     2
-#define BLOCKTYPE_COMPSCRIPT 3
-#define BLOCKTYPE_EOF        0xff
+#define BLOCKTYPE_MAIN        1
+#define BLOCKTYPE_SCRIPT      2
+#define BLOCKTYPE_COMPSCRIPT  3
+#define BLOCKTYPE_COMPSCRIPT2 4
+#define BLOCKTYPE_EOF         0xff
 
 extern void load_script_configuration(FILE*);
 extern void save_script_configuration(FILE*);
@@ -934,11 +933,13 @@ void load_room(char *files, roomstruct *rstruc) {
         for (hh = 0; hh < lee; hh++)
           rstruc->scripts[hh] += passwencstring[hh % 11];
       }
-      else if (thisblock == BLOCKTYPE_COMPSCRIPT) {
+      else if (thisblock == BLOCKTYPE_COMPSCRIPT2) {
         fread(&hh, 4, 1, opty);
         rstruc->compiled_script = (scScript)malloc(hh + 5);
         fread(rstruc->compiled_script, hh, 1, opty);
       }
+      else if (thisblock == BLOCKTYPE_COMPSCRIPT)
+        quit("Load_room: old room format. Please upgrade the room.");
       else
         quit("Load_room: Unknown block type encountered");
 
@@ -1073,6 +1074,8 @@ struct DialogTopic {
 #define OPT_TWCUSTOM        5
 #define OPT_DIALOGGAP       6
 #define OPT_NOSKIPTEXT      7
+#define OPT_DISABLEOFF      8
+#define OPT_ALWAYSSPCH      9
 #define SPF_640x400         1
 
 struct OriGameStruct {

@@ -17,6 +17,7 @@
 #include "wgt2allg.h"
 
 #include "acroom.h"
+#include "seer.h"
 
 #define INI_READONLY
 // #include <myini.h>
@@ -111,7 +112,7 @@ block screenop = NULL;
 int user_disabled_for=0,user_disabled_data=0,user_disabled_data2=0;
 int user_disabled_data3=0;
 DialogTopic *dialog;
-char*messages[MAXGLOBALMES];
+char*messages[900];
 int _global_x_offset=-1, _global_y_offset=0;
 int screen_state=0;
 int ccSymOffset=0;
@@ -178,6 +179,8 @@ int use_cdplayer=0;
 int numcddrives=0;
 char cd_driveletters[26],cddrive;
 
+char pexbuf[STD_BUFFER_SIZE];
+
 void set_mouse_cursor(int);
 int  run_text_script(scInstance*,char*);
 void run_graph_script(int);
@@ -188,9 +191,11 @@ void AnimateObject(int,int,int,int);
 void SetObjectView(int,int);
 void GiveScore(int);
 void walk_character(int,int,int,int,int);
+void move_object(int,int,int,int,int);
 void StopMoving(int);
 void MoveCharacterToHotspot(int,int);
 int  GetCursorMode();
+void GetLocationName(int,int,char*);
 void save_game(int,char*);
 int  load_game(int);
 void update_music_volume();
@@ -456,15 +461,12 @@ int prepare_text_script(scInstance*sci,char*tsname) {
   scmouse.x=mousex/sxmult;
   scmouse.y=mousey/symult;
   inside_script++;
-  aborted_ip=0;
-  abort_executor=0;
   return 0;
   }
 
 void post_script_cleanup() {
   // should do any post-script stuff here, like go to new room
   if (scErrorNo) quit(scErrorMsg);
-  if (abort_executor) user_disabled_data2=aborted_ip;
   if (request_invscreen) {
     invscreen();
     request_invscreen=0;
@@ -548,7 +550,7 @@ void my_fade_in(PALLETE p, int speed) {
 }
 
 block fix_bitmap_size(block todubl) {
-  if (todubl->w==scrnwid) return todubl;
+  if ((todubl->w==scrnwid) && (todubl->h==scrnhit)) return todubl;
   int oldw=todubl->w, oldh=todubl->h;
   block tempb=create_bitmap(thisroom.width*sxmult,thisroom.height*symult);
   set_clip(tempb,0,0,tempb->w-1,tempb->h-1);
@@ -563,7 +565,10 @@ block fix_bitmap_size(block todubl) {
 #define hdrDataSize 10
 #define hdrStackSize 12
 void save_room_data_segment () {
+  int ff;
   FadeOut(5);
+  for (ff=0;ff<croom->numobj;ff++)
+    objs[ff].moving=0;
   if (croom==NULL) return;
   if (roominst!=NULL) {
     croom->tsdatasize=ToCodeINT(roominst)[hdrDataSize];
@@ -618,6 +623,7 @@ void load_new_room(int newnum,CharacterInfo*forchar) {
       croom->obj[cc].loop=0;
       croom->obj[cc].frame=0;
       croom->obj[cc].wait=0;
+      croom->obj[cc].moving=-1;
       croom->obj[cc].baseline=-1;
       if (thisroom.objbaseline[cc]>=0)
 //        croom->obj[cc].baseoffs=thisroom.objbaseline[cc]-thisroom.sprs[cc].y;
@@ -750,7 +756,6 @@ void main_loop_until(int untilwhat,int udata,int mousestuff) {
 //         4: move to (ignore walls)
 //         5: place at
 void run_animation_stage(AnimationStruct*stage) {
-  char buf[200];
   if (stage->action==0) quit("!undefined animation command");
   if (stage->object==MANOBJNUM) ;
   else if (stage->object>9)
@@ -782,11 +787,15 @@ void run_animation_stage(AnimationStruct*stage) {
     }
   }
   else if ((stage->action==3) | (stage->action==4)) { // move to
-    if (stage->object!=MANOBJNUM) quit("only the player object can move");
     int ignwal=0;
     if (stage->action==4) ignwal=1;
-    walk_character(game.playercharacter,stage->x,stage->y,ignwal,false);
-    if (stage->wait) do_main_cycle(UNTIL_MOVEEND,(int)&playerchar->walking);
+    if (stage->object!=MANOBJNUM) {
+      move_object(stage->object,stage->x,stage->y,stage->speed,ignwal);
+      if (stage->wait) do_main_cycle(UNTIL_MOVEEND,(int)&objs[stage->object].moving);
+    } else {
+      walk_character(game.playercharacter,stage->x,stage->y,ignwal,false);
+      if (stage->wait) do_main_cycle(UNTIL_MOVEEND,(int)&playerchar->walking);
+    }
   }
   else if (stage->action==5) { // place at
     if (stage->object==MANOBJNUM) {
@@ -1101,6 +1110,9 @@ void update_stuff() {
   // update graphics for object if cycling view
   for (aa=0;aa<croom->numobj;aa++) {
     if (objs[aa].on==0) continue;
+    if (objs[aa].moving>0) {
+      do_movelist_move(&objs[aa].moving,&objs[aa].x,&objs[aa].y);
+      }
     if (objs[aa].cycling==0) continue;
     if (objs[aa].view<0) continue;
     if (objs[aa].wait>0) { objs[aa].wait--; continue; }
@@ -1226,9 +1238,7 @@ void printtext(int xx,int yy,int ww, char*text) {
       else if (stricmp(macroname,"gamename")==0)
         strcpy(tempo, game.gamename);
       else if (stricmp(macroname,"overhotspot")==0) {
-        int loc=getpixel(thisroom.lookat,(mousex+offsetx)/sxmult,(mousey+offsety)/symult);
-        if (loc<1) tempo[0]=0;
-        else strcpy(tempo,thisroom.hotspotnames[loc]);
+        GetLocationName(mousex/sxmult,mousey/sxmult,tempo);
       }
       strcat(oritext,tempo);
     }
@@ -1309,7 +1319,7 @@ void draw_interface(InterfaceElement*iep,int ienum) {
     else if ((iep->button[ee].flags & IBFLG_ENABLED)==0) ;
     else if (play.disabled_user_interface!=0) ;
     else {
-      if (ismouseinbox(tdxp,tdyp,tdxp+offsx,tdyp+offsy)==-1) {
+      if (ismouseinbox(tdxp,tdyp,tdxp+offsx-1,tdyp+offsy-1)==-1) {
         mouse_on_iface_button=ee;
         mouse_ifacebut_xoffs=mousex-tdxp;
         mouse_ifacebut_yoffs=mousey-tdyp;
@@ -1339,8 +1349,12 @@ void draw_interface(InterfaceElement*iep,int ienum) {
         }
       }
     } else {
-      wputblock(tdxp,tdyp,images[pic],0);
-      if (((iep->button[ee].flags & IBFLG_ENABLED)==0) | (play.disabled_user_interface>0)) {
+      int is_disabled=0;
+      if (((iep->button[ee].flags & IBFLG_ENABLED)==0) | (play.disabled_user_interface>0))
+        is_disabled=1;
+      if ((is_disabled==1) & (game.options[OPT_DISABLEOFF]!=0)) ;
+      else wputblock(tdxp,tdyp,images[pic],0);
+      if ((is_disabled==1) & (game.options[OPT_DISABLEOFF]==0)) {
         int wid,hit;
         for (wid=0;wid<images[pic]->w;wid++) { // grid pattern
           for (hit=wid%2;hit<images[pic]->h;hit+=2)
@@ -1564,11 +1578,12 @@ void update_screen() {
 
 void atexit_handler() {
   if (proper_exit==0) {
-    printf("\nError: the program has exited without requesting it.\n"
-      "Program pointer: %+03d  (write t his number down)\n"
+    sprintf(pexbuf,"\nError: the program has exited without requesting it.\n"
+      "Program pointer: %+03d  (write this number down), ACI version " ACI_VERSION_TEXT "\n"
       "If you see a list of numbers above, please write them down and contact\n"
       "Chris Jones. Otherwise, note down any other information displayed.\n",
       our_eip);
+    printf(pexbuf);
   }
 }
 
@@ -1600,7 +1615,10 @@ void quit(char*quitmsg) {
   }
 
   if (quitmsg[0]=='|') ;
-  else printf("%s\n",quitmsg);
+  else {
+    sprintf(pexbuf,"%s\n",quitmsg);
+    printf(pexbuf);
+  }
 
   if (play.debug_mode!=0)
     printf("Average fps: %d\n",fps);
@@ -1647,11 +1665,12 @@ int load_game_file() {
   FILE*iii=clibfopen("ac2game.dta","rb");
   if (iii==NULL) return -1;
 
+  our_eip=-16;
   char teststr[31];
   teststr[30]=0;
   fread(&teststr[0],30,1,iii);
   int filever=getw(iii);
-  if (filever!=6) {
+  if (filever!=7) {
     fclose(iii);
     return -2;
   }
@@ -1662,6 +1681,7 @@ int load_game_file() {
   fseek(iii,cscriptsize,SEEK_CUR);
 
   cscriptsize=getw(iii);
+  our_eip=-15;
   compiled_script=(scScript)malloc(cscriptsize+5);
   fread(compiled_script,cscriptsize,1,iii);
 
@@ -1672,6 +1692,7 @@ int load_game_file() {
   cscriptsize=getw(iii);
   fseek(iii,cscriptsize*sizeof(SpritesFolder),SEEK_CUR);
 
+  our_eip=-14;
   game.chars=(CharacterInfo*)calloc(1,sizeof(CharacterInfo)*game.numcharacters+5);
   fread(&game.chars[0],sizeof(CharacterInfo),game.numcharacters,iii);
 
@@ -1681,6 +1702,7 @@ int load_game_file() {
     fgetstring(game.messages[ee],iii);
   }
 
+  our_eip=-13;
   dialog=(DialogTopic*)malloc(sizeof(DialogTopic)*game.numdialog+5);
   fread(&dialog[0],sizeof(DialogTopic),game.numdialog,iii);
   for (ee=0;ee<game.numdialog;ee++) {
@@ -1692,6 +1714,7 @@ int load_game_file() {
     fseek(iii,getw(iii),SEEK_CUR);
   }
 
+  our_eip=-12;
   for (ee=0;ee<game.numdlgmessage;ee++) {
     messages[ee]=(char *)malloc(200);
     fgetstring(messages[ee],iii);
@@ -1701,6 +1724,7 @@ int load_game_file() {
 
   if (game.numfonts==0) return -2;
 
+  our_eip=-11;
   for (ee=0;ee<game.numcharacters;ee++) {
     game.chars[ee].walking=0;
     game.chars[ee].animating=0;
@@ -1711,12 +1735,14 @@ int load_game_file() {
     else game.iface[ee].on=1;
   }
 
+  our_eip=-21;
   scAdd_External_Symbol("character",&game.chars[0]);
   playerchar=&game.chars[game.playercharacter];
   scAdd_External_Symbol("player",playerchar);
   gameinst = (scInstance*)scCreate_Instance(compiled_script,"");
   if (gameinst == NULL) return -3;
 
+  our_eip=-22;
   char filnm[20];
   for (ee=0;ee<game.numfonts;ee++) {
     sprintf(filnm,"agsfnt%d.wfn",ee);
@@ -1794,7 +1820,7 @@ void break_up_text_into_lines(int wii,int fonnt,char *todis) {
         int rr=-1;
         while (win[rr]!=' ') {
           rr--;
-          if (rr<-strlen(theline))
+          if (rr<-(int)strlen(theline))
             quit("!Display: single word longer than window width");
         }
         win[rr]=0; strcpy(lines[numlines],theline);
@@ -1927,15 +1953,6 @@ void DisplayAt(int xxp,int yyp,int widd,char*texx, ...) {
   _display_at(xxp,yyp,widd,displbuf,1,0);
   }
 
-void Display(char*texx, ...) {
-  char displbuf[300];
-  va_list ap;
-  va_start(ap,texx);
-  vsprintf(displbuf,texx,ap);
-  va_end(ap);
-  _display_at(-1,-1,scrnwid/2+scrnwid/4,displbuf,1,0);
-}
-
 #define CHANIM_SPEED 5
 void DisplaySpeech(char*texx,int askip,int aschar) {
   if (askip!=0)
@@ -1967,6 +1984,25 @@ void DisplaySpeech(char*texx,int askip,int aschar) {
     game.chars[aschar].animating=0;
     game.chars[aschar].frame=0;
   }
+}
+
+void Display(char*texx, ...) {
+  char displbuf[340];
+  va_list ap;
+  va_start(ap,texx);
+  vsprintf(displbuf,texx,ap);
+  va_end(ap);
+  if (game.options[OPT_ALWAYSSPCH])
+    DisplaySpeech(displbuf,1,game.playercharacter);
+  else
+    _display_at(-1,-1,scrnwid/2+scrnwid/4,displbuf,1,0);
+}
+
+void __sc_displayspeech(int chid,char *texx)
+{
+  if ((chid<0) || (chid>=game.numcharacters))
+    quit("!DisplaySpeech: invalid character specified");
+  DisplaySpeech(texx,1,chid);
 }
 
 int display_message=0;
@@ -2121,7 +2157,10 @@ int fli_callback() {
   return 0;
 }
 
-void play_flc_file(int numb,int playflags) { canabort=playflags;
+void play_flc_file(int numb,int playflags) {
+  color oldpal[256];
+  wreadpalette(0,255,oldpal);
+  canabort=playflags;
   char flicnam[20]; sprintf(flicnam,"flic%d.flc",numb);
   FILE*iii=clibfopen(flicnam,"rb");
   if (iii==NULL) { sprintf(flicnam,"flic%d.fli",numb);
@@ -2139,7 +2178,7 @@ void play_flc_file(int numb,int playflags) { canabort=playflags;
   if (play_fli(flicnam,fli_buffer,0,fli_callback)==FLI_ERROR)
     quit("FLI/FLC animation play error");
   wfreeblock(fli_buffer);
-  setpal();
+  wsetpalette(0,255,oldpal);
 }
 // FLIC player end
 
@@ -2341,14 +2380,14 @@ int check_click_on_character(int xx,int yy,int mood) {
   return 0;
 }
 
-void break_out_seer() {
-  if (user_disabled_for!=0)
-    quit("break_out_seer: user_disabled_For is set");
-  user_disabled_data2=Register(scActual_Instance)[regIP];
-  user_disabled_data3=(int)scActual_Instance;
-  user_disabled_for=FOR_SCRIPT;
-  scaddr=Register(scActual_Instance)[regCP];
-  abort_executor=1;
+void move_object(int objj,int tox,int toy,int spee,int ignwal) {
+  move_speed=spee;
+  if (objj>8)
+    quit("Object 9 can't move. Use a lower object number");
+  int mslot=find_route(objs[objj].x,objs[objj].y,tox,toy,thisroom.walls,objj+1,1,ignwal);
+  if (mslot>0) {
+    objs[objj].moving=mslot;
+  }
 }
 
 void walk_character(int chac,int tox,int toy,int ignwal,int blk) {
@@ -2362,8 +2401,7 @@ void walk_character(int chac,int tox,int toy,int ignwal,int blk) {
     chin->loop=fix_player_sprite(&mls[mslot]);
   }
   if (blk!=0) {
-    break_out_seer();
-    main_loop_until(UNTIL_MOVEEND,(int)&chin->walking,0);
+    quit("error: breakseer set");
   }
 }
 
@@ -2427,9 +2465,9 @@ int do_movelist_move(short*mlnum,int*xx,int*yy) {
   else yps=cmls->fromy+(int)(fixtof(ypermove)*(float)cmls->onpart);
 
   // check if finished horizontal movement
-  if ((xpermove>0) & (xps>=(cmls->pos[cmls->onstage+1] >> 16)))
+  if ((xpermove>0) & (xps>=((cmls->pos[cmls->onstage+1] >> 16) & 0x00ffff)))
     cmls->doneflag|=1;
-  else if ((xpermove<0) & (xps<=(cmls->pos[cmls->onstage+1] >> 16)))
+  else if ((xpermove<0) & (xps<=((cmls->pos[cmls->onstage+1] >> 16) & 0x00ffff)))
     cmls->doneflag|=1;
 
   // check if finished vertical movement
@@ -2549,6 +2587,7 @@ void SetPlayerCharacter(int newchar) {
     quit("!SetPlayerCharacter: Invalid character specified");
   game.playercharacter=newchar;
   playerchar=&game.chars[newchar];
+  update_invorder();
   NewRoom(playerchar->room);
 }
 
@@ -2610,6 +2649,15 @@ void NewRoom(int nrnum) {
   if (request_newroom>=0)
     quit("!NewRoom: requested 2 room changes within one script");
   request_newroom=nrnum;
+}
+
+void NewRoomEx(int nrnum,int newx,int newy) {
+  if ((newx<0) | (newx>=320) | (newy<0) | (newy>=200))
+    quit("!NewRoomEx: invalid co-ordinates specified");
+  new_room_pos=0;
+  playerchar->x=newx;
+  playerchar->y=newy;
+  NewRoom(nrnum);
 }
 
 void SetGameSpeed(int newspd) {
@@ -2715,6 +2763,10 @@ void MoveCharacter(int cc,int xx,int yy) {
   walk_character(cc,xx,yy,0,0);
   }
 
+void MoveObject(int objj,int xx,int yy,int spp) {
+  move_object(objj,xx,yy,spp,0);
+  }
+
 int GetPlayerCharacter() {
   return game.playercharacter;
   }
@@ -2771,6 +2823,8 @@ void MoveCharacterToObject(int chaa,int obbj) {
 }
 
 void MoveCharacterToHotspot(int chaa,int hotsp) {
+  if ((hotsp<0) || (hotsp>=MAX_HOTSPOTS))
+    quit("!MovecharacterToHotspot: invalid hotspot");
   if (thisroom.hswalkto[hotsp].x<1) return;
   walk_character(chaa,thisroom.hswalkto[hotsp].x,thisroom.hswalkto[hotsp].y,0,0);
   do_main_cycle(UNTIL_MOVEEND,(int)&game.chars[chaa].walking);
@@ -2896,14 +2950,15 @@ int run_graph_commandlist(int ct) {
       case 5: // run animation
         run_animation(&thisroom.anims[gse->_using],0);
         break;
+      case 8: // run dialog
+        RunDialog(gse->_using);
+        break;
       case 6: // display message
         DisplayMessage(gse->_using);
         break;
       case 7: // remove object
         ObjectOff(gse->_using);
         break;
-      /*case 8: // reserved
-        break;*/
       case 16: // play sound effect
         play_audio_clip_by_index(gse->_using);
         break;
@@ -2982,8 +3037,7 @@ int run_graph_commandlist(int ct) {
         MoveCharacterToObject(game.playercharacter,gse->_using);
         break;
       default:
-        int val;
-        char msg[50]; int evnt;
+        char msg[50];
         sprintf(msg,"run_graph_script: unknown evnt %d",(int)gse->type-1);
         quit(msg);
     }
@@ -3480,6 +3534,7 @@ void setup_script_exports() {
   scAdd_External_Symbol("Display",(void *)Display);
   scAdd_External_Symbol("DisplayAt",(void *)DisplayAt);
   scAdd_External_Symbol("DisplayMessage",(void *)DisplayMessage);
+  scAdd_External_Symbol("DisplaySpeech",(void *)__sc_displayspeech);
   scAdd_External_Symbol("EnableCursorMode",(void *)enable_cursor_mode);
   scAdd_External_Symbol("EndCapture",(void *)EndCapture);
   scAdd_External_Symbol("FaceCharacter",(void *)FaceCharacter);
@@ -3501,8 +3556,11 @@ void setup_script_exports() {
   scAdd_External_Symbol("InventoryScreen",(void *)sc_invscreen);
   scAdd_External_Symbol("IsGamePaused",(void *)IsGamePaused);
   scAdd_External_Symbol("MoveCharacter",(void *)MoveCharacter);
+  scAdd_External_Symbol("MoveCharacterToHotspot",(void *)MoveCharacterToHotspot);
   scAdd_External_Symbol("MoveCharacterToObject",(void *)MoveCharacterToObject);
+  scAdd_External_Symbol("MoveObject",(void *)MoveObject);
   scAdd_External_Symbol("NewRoom",(void *)NewRoom);
+  scAdd_External_Symbol("NewRoomEx",(void *)NewRoomEx);
   scAdd_External_Symbol("ObjectOff",(void *)ObjectOff);
   scAdd_External_Symbol("ObjectOn",(void *)ObjectOn);
   scAdd_External_Symbol("PlayFlic",(void *)play_flc_file);
@@ -3580,8 +3638,8 @@ void mainloop() {
   numevents=0;
   our_eip=7;
   poll_mp3();
-  gettime(&t2);
   loopcounter++;
+  gettime(&t2);
   if (wtimer(t1,t2)>100) {
     gettime(&t1);
     fps=loopcounter-lastcounter;
@@ -3623,6 +3681,9 @@ int main_game_loop() {
     else if (restrict_until==UNTIL_CHARIS0) {
       char*chptr=(char*)user_disabled_data;
       if (chptr[0]==0) restrict_until=0; }
+    else if (restrict_until==UNTIL_NEGATIVE) {
+      short*wkptr=(short*)user_disabled_data;
+      if (wkptr[0]<0) restrict_until=0; }
     else if (restrict_until==UNTIL_NOOVERLAY) {
       if (screen_state==0) restrict_until=0; }
     else quit("loop_until: unknown until event");
@@ -3634,18 +3695,9 @@ int main_game_loop() {
       else if (user_disabled_for==FOR_EXITLOOP) {
         user_disabled_for=0; return -1; }
       else if (user_disabled_for==FOR_SCRIPT) {
-        user_disabled_for=-2;
-        scActual_Instance=(scInstance*)user_disabled_data3;
-        Register(scActual_Instance)[regIP]=user_disabled_data2;
-        scInstance*inst=scActual_Instance;
-        Register(inst)[regCP]=Register(inst)[regSP]=ToCodeINT(inst)[hdrStackSize];
+        quit("err: user_dis: FOR_SCript");
       }
-      if (user_disabled_for<0) {
-        user_disabled_for=0;
-        if (Executor(scActual_Instance,-1)<0)
-          quit(scErrorMsg);
-      }
-      else user_disabled_for=0;
+      user_disabled_for=0;
     }
   }
   return 0;
@@ -3721,6 +3773,7 @@ int main(int argc,char**argv)
     }
     return 8;
   }
+  scInit_SeeR();
   allegro_init();
   if (init_cd_player()==0) {
     printf("CD-ROM Audio support enabled.\n");
@@ -3774,8 +3827,8 @@ int main(int argc,char**argv)
     opts.mod_player=0;
     opts.mp3_player=0;
     if (install_sound(usetup.digicard,usetup.midicard,NULL)!=0) {
-      printf("\nUnable to initialize your audio hardware.\n");
-      printf("[Problem: %s]\n",allegro_error);
+      printf("\nUnable to initialize your audio hardware.\n"
+        "[Problem: %s]\n",allegro_error);
       proper_exit=1;
       return 7;
     }
@@ -3785,13 +3838,13 @@ int main(int argc,char**argv)
     else install_amp();
   }
   if (debug_flags>0) {
-    printf("Engine debugging enabled.\n");
-    printf("\nNOTE: You have selected to enable one or more engine debugging options.\n");
-    printf("These options cause many parts of the game to behave abnormally, and you\n");
-    printf("may not see the game as you are used to it. The point is to test whether\n");
-    printf("the engine passes a point where it is crashing on you normally.\n");
-    printf("[Debug flags enabled: 0x%02X]\n",debug_flags);
-    printf("Press a key to continue.\n");
+    printf("Engine debugging enabled.\n"
+      "\nNOTE: You have selected to enable one or more engine debugging options.\n"
+      "These options cause many parts of the game to behave abnormally, and you\n"
+      "may not see the game as you are used to it. The point is to test whether\n"
+      "the engine passes a point where it is crashing on you normally.\n"
+      "[Debug flags enabled: 0x%02X]\n"
+      "Press a key to continue.\n",debug_flags);
     getch();
   }
   our_eip=-10;
@@ -3858,16 +3911,20 @@ int main(int argc,char**argv)
       return 5;
     }
   }
-  our_eip=-8;
+  our_eip=-25;
   for (ee=0;ee<MAX_INIT_SPR+MAX_CHARACTERS;ee++) {
     actsps[ee]=NULL;
   }
+  our_eip=-20;
   thisroom.allocall();
+  our_eip=-19;
   setup_sierra_interface();
+  our_eip=-18;
   setup_script_exports();
+  our_eip=-17;
   if ((ee=load_game_file())!=0) {
-    set_gfx_mode(GFX_TEXT,80,25,0,0);
     proper_exit=1;
+    set_gfx_mode(GFX_TEXT,80,25,0,0);
     printf("Could not load game file.\n(Reason: ");
     if (ee==-1)
       printf("File not found. Please run the Room Editor to create a game first).\n");
@@ -3962,7 +4019,8 @@ int main(int argc,char**argv)
   newmusic(0);
   run_text_script(gameinst,"game_start");
   our_eip=-3;
-  new_room(playerchar->room,playerchar);
+  FadeOut(5);
+  load_new_room(playerchar->room,playerchar);
   gettime(&t1);
   lastcounter=0;
   loopcounter=0;

@@ -1,6 +1,4 @@
 DONE:
-
-TODO:
 vga256
 wsetmode
 wgetmode
@@ -37,7 +35,7 @@ csavecompressed
 cunpackbitl
 fputstring
 fgetstring
-allocall
+(*) allocall
 freemessage
 freeall
 save_lzw
@@ -69,8 +67,8 @@ setup_for_dialog
 restore_after_dialog
 restore_game_dialog
 save_game_dialog
-prepare_text_script
-post_script_cleanup
+(*) prepare_text_script
+(*) post_script_cleanup
 run_text_script
 run_text_script_iparam
 run_text_script_2iparam
@@ -78,12 +76,12 @@ my_fade_from_range
 my_fade_out
 FadeOut
 my_fade_in
-fix_bitmap_size
-save_room_data_segment
-load_new_room
+(*) fix_bitmap_size
+(*) save_room_data_segment
+(*) load_new_room
 new_room
 main_loop_until
-run_animation_stage
+(*) run_animation_stage
 run_animation
 setevent
 process_event
@@ -100,10 +98,10 @@ offset_over_inv
 run_event_block_inv
 check_controls
 fix_player_sprite
-update_stuff
-printtext
+(*) update_stuff
+(*) printtext
 update_invorder
-draw_interface
+(*) draw_interface
 sort_out_walk_behinds
 clear_sprite_list
 add_to_sprite_list
@@ -111,20 +109,20 @@ draw_sprite_list
 draw_screen_background
 draw_topbar
 update_screen
-atexit_handler
-quit
+(*) atexit_handler
+(*) quit
 setup_sierra_interface
-load_game_file
+(*) load_game_file
 poll_mp3
 do_corner
 draw_button_background
-break_up_text_into_lines
+(*) break_up_text_into_lines
 ensure_text_valid
 _display_at
 DisplayAt
-DisplaySpeech
-Display
-__sc_displayspeech
+(*) DisplaySpeech
+(*) Display
+(*) __sc_displayspeech
 DisplayMessage
 CaptureScreen
 EndCapture
@@ -138,7 +136,7 @@ ObjectOn
 SetObjectGraphic
 make_ts_func_name
 fli_callback
-play_flc_file
+(*) play_flc_file
 play_sound
 play_audio_clip_by_index
 add_inventory
@@ -148,14 +146,14 @@ isposinbox
 check_click_on_object
 is_pos_on_character
 check_click_on_character
-move_object
-walk_character
+(*) move_object
+(*) walk_character
 ProcessClick
-do_movelist_move
+(*) do_movelist_move
 stopmusic
 update_music_volume
 newmusic
-SetPlayerCharacter
+(*) SetPlayerCharacter
 QuitGame
 FileOpen
 FileClose
@@ -165,7 +163,7 @@ InterfaceOn
 InterfaceOff
 IsGamePaused
 NewRoom
-NewRoomEx
+(*) NewRoomEx
 SetGameSpeed
 SetDialogOption
 CyclePalette
@@ -178,14 +176,14 @@ GiveScore
 GetLocationName
 GetInvName
 MoveCharacter
-MoveObject
+(*) MoveObject
 GetPlayerCharacter
 SetCharacterView
 ReleaseCharacterView
 FaceLocation
 FaceCharacter
 MoveCharacterToObject
-MoveCharacterToHotspot
+(*) MoveCharacterToHotspot
 StopMoving
 GetLanguageString
 script_debug
@@ -193,7 +191,7 @@ cd_player_control
 _sc_strcat
 get_graph_variable
 set_graph_variable
-run_graph_commandlist
+(*) run_graph_commandlist
 fget_long
 run_graph_script
 run_dialog_request
@@ -204,14 +202,14 @@ load_game
 __actual_invscreen
 invscreen
 sc_invscreen
-setup_script_exports
-mainloop
+(*) setup_script_exports
+(*) mainloop
 check_write_access
 run_setup
-main_game_loop
+(*) main_game_loop
 do_main_cycle
 init_cd_player
-main
+(*) main
 GameStruct
 is_valid_character
 is_valid_object
