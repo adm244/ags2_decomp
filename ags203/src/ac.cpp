@@ -839,17 +839,15 @@ void setevent(int evtyp,int ev1,int ev2,int ev3) {
 }
 
 void process_event(EventHappened*evp) {
-  EventBlock*evpt;
   if (evp->type==EV_TEXTSCRIPT) {
-    evpt=NULL;
-    scErrorNo=0;
+    int resl=0; scErrorNo=0;
     if (evp->data2>-1000)
-      evpt=(EventBlock*)run_text_script_iparam(gameinst,tsnames[evp->data1],evp->data2);
+      resl=run_text_script_iparam(gameinst,tsnames[evp->data1],evp->data2);
     else
-      evpt=(EventBlock*)run_text_script(gameinst,tsnames[evp->data1]);
+      resl=run_text_script(gameinst,tsnames[evp->data1]);
   }
   else if (evp->type==EV_RUNEVBLOCK) {
-    evpt=NULL;
+    EventBlock*evpt=NULL;
     if (evp->data1==EVB_HOTSPOT) {
       evpt=&croom->hscond[evp->data2];
       evblockbasename="hotspot%d";
