@@ -3553,7 +3553,7 @@ int main(int argc,char**argv)
   }
   if (scrnwid==960) {
     _old_screen=screen;
-    clear(screen);
+    clear(_old_screen);
     screen=create_sub_bitmap(_old_screen,32,84,960,600);
   }
   block splashsc=load_pcx("preload.pcx",temppal);
