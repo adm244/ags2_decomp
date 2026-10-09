@@ -4,7 +4,10 @@
 #include "wgt2allg.h"
 #include <string.h>
 #include <conio.h>
+
+#ifndef WINDOWS_VERSION
 #include <dir.h>
+#endif
 
 const int NONE=-1,LEFT=0,RIGHT=1;
 
@@ -742,6 +745,49 @@ unsigned long filedates[MAXSAVEGAMES];
 
 int numsaves=0;
 char descrp[200];
+
+#ifdef WINDOWS_VERSION
+struct ffblk {
+  char ff_name[250];
+  unsigned long ff_fdate;
+  unsigned long ff_ftime;
+};
+
+long hfd = -1;
+struct _finddata_t sfd;
+
+int findfirst(char *pattern, struct ffblk *ffblk, int attrib)
+{
+  hfd = _findfirst(pattern, &sfd);
+  if (hfd == -1) {
+    return -1;
+  }
+  ffblk->ff_fdate = sfd.time_write;
+  ffblk->ff_ftime = 0;
+  strcpy(ffblk->ff_name, sfd.name);
+  return 0;
+}
+
+void findclose()
+{
+  if (hfd != -1) {
+    _findclose(hfd);
+  }
+  hfd = -1;
+}
+
+int findnext(struct ffblk *ffblk)
+{
+  if (_findnext(hfd, &sfd) == -1) {
+    findclose();
+    return -1;
+  }
+  ffblk->ff_fdate = sfd.time_write;
+  ffblk->ff_ftime = 0;
+  strcpy(ffblk->ff_name, sfd.name);
+  return 0;
+}
+#endif
 
 void preparesavegamelist(int ctrllist)
 {

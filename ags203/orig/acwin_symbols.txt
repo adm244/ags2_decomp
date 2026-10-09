@@ -1,0 +1,7 @@
+update_music_volume;4228576;4228627
+play_sound;4225040;4225151
+run_graph_commandlist;4232400;4233220
+run_dialog_request;4233616;4233896
+quit;4218480;4218620
+main;4240736;4243715
+my_readkey;4204240;4204268

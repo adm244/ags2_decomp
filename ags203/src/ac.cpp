@@ -16,6 +16,10 @@
 #define USE_CLIB
 #include "wgt2allg.h"
 
+#ifdef WINDOWS_VERSION
+#include "winalleg.h"
+#endif
+
 #include "acroom.h"
 #include "seer.h"
 
@@ -53,6 +57,7 @@ extern int  quitdialog();
 extern wgtfont fonts[10];
 extern int  enternumberwindow(char*);
 
+#ifndef WINDOWS_VERSION
 // CD Player functions
 // flags returned with cd_getstatus
 #define CDS_DRIVEOPEN    0x0001  // tray is open
@@ -73,6 +78,7 @@ extern void cd_eject(int);
 extern void cd_uneject(int);
 extern int  cd_getlasttrack(int);
 extern int  cd_isplayingaudio(int);
+#endif
 
 #include "acruntim.h"
 
@@ -204,6 +210,34 @@ void process_interface_click(int,int);
 void do_conversation(int);
 void setevent(int evtyp,int ev1=0,int ev2=-1000,int ev3=0);
 
+#ifdef WINDOWS_VERSION
+#define EXTENDED_KEY_CODE 0
+int my_readkey() {
+  int gott=readkey();
+
+  if ((gott & 0x00ff) == EXTENDED_KEY_CODE)
+    gott = ((gott >> 8) & 0x00ff) + 300;
+  else
+    gott = (gott & 0x00ff);
+
+  return gott;
+}
+#define getch() my_readkey()
+#undef kbhit
+#define kbhit keypressed
+#define DisplayAlert(text) MessageBox(NULL,text,"Adventure Game Studio", MB_OK | MB_ICONINFORMATION)
+#define _dos_getdiskfree _getdiskfree
+#define install_mod(no_voices) -1
+#define load_mod(filename) NULL
+#define play_mod(j,loop) 0
+#define stop_mod() 0
+#define is_mod_playing() 0
+#define destroy_mod(j) 0
+#define set_mod_volume(volume) 0
+#else
+#define DisplayAlert printf
+#endif
+
 char filetouse[80]="C:\\TC\\CHRISJ.INI";
 char*mytmpini="~myini.tmp";
 
@@ -273,7 +307,7 @@ char*INIreaditem(char*sectn,const char*entry,int errornosect=1,int offs=0) {
     }
     templine[ii]=0;
     strupr(templine);
-    if (strcasecmp(sectn,templine)==0) break;
+    if (stricmp(sectn,templine)==0) break;
   }
   for (ii=0;ii<60;ii++) templine[ii]=0;
   tempval=(char*)malloc(160);
@@ -306,7 +340,7 @@ char*INIreaditem(char*sectn,const char*entry,int errornosect=1,int offs=0) {
       if (templine[jj]==' ') templine[jj]=0;
       else break;
     }
-    if (strcasecmp(templine,entry)==0) { // key found
+    if (stricmp(templine,entry)==0) { // key found
       if (INIreadchar(fin)!=' ') {
         fseek(fin,-1,SEEK_CUR);
         ini_read--;
@@ -358,6 +392,7 @@ void setpal() {
   wsetpalette(0,255,palette);
 }
 
+#ifndef WINDOWS_VERSION
 // override packfile functions to allow it to load from our
 // custom CLIB datafiles
 extern "C" {
@@ -380,11 +415,16 @@ PACKFILE *pack_fopen(char*filnam,char*modd) {
 } // end extern "C"
 
 // end packfile functions
+#endif
 
 volatile int timerloop=0;
 int time_between_timers=25;  // in milliseconds
 // our timer, used to keep game running at same speed on all systems
+#ifdef WINDOWS_VERSION
+void __cdecl dj_timer_handler() {
+#else
 void dj_timer_handler(...) {
+#endif
   timerloop++;
   }
 END_OF_FUNCTION(dj_timer_handler);
@@ -1581,7 +1621,7 @@ void atexit_handler() {
       "If you see a list of numbers above, please write them down and contact\n"
       "Chris Jones. Otherwise, note down any other information displayed.\n",
       our_eip);
-    printf(pexbuf);
+    DisplayAlert(pexbuf);
   }
 }
 
@@ -1592,20 +1632,22 @@ void atexit_handler() {
 // message. If it begins with anything else, it is treated as an internal
 // error.
 void quit(char*quitmsg) {
+#ifndef WINDOWS_VERSION
   set_gfx_mode(GFX_TEXT,80,25,0,0);
+#endif
   allegro_exit();
 
   if (quitmsg[0]=='|') ; //quitmsg++;
   else if (quitmsg[0]=='!') { 
     quitmsg++;
-    printf(
+    DisplayAlert(
       "An error has occured. Please contact the game author for support, as this\n"
       "problem is caused by the game rather than the interpreter.\n"
       "(ACI version " ACI_VERSION_TEXT ")\n\nError: "
     );
   }
   else {
-    printf(
+    DisplayAlert(
       "An internal error has occured. Please note down the following information.\n"
       "If the problem persists, contact Chris Jones.\n"
       "(ACI version " ACI_VERSION_TEXT ")\n\nError: "
@@ -1615,11 +1657,13 @@ void quit(char*quitmsg) {
   if (quitmsg[0]=='|') ;
   else {
     sprintf(pexbuf,"%s\n",quitmsg);
-    printf(pexbuf);
+    DisplayAlert(pexbuf);
   }
 
+#ifndef WINDOWS_VERSION
   if (play.debug_mode!=0)
     printf("Average fps: %d\n",fps);
+#endif
 
   remove("agssave.999");
   system("del ~ac*.tmp");
@@ -2883,6 +2927,7 @@ void script_debug(int cmdd) {
 }
 
 int cd_player_control(int cmdd,int datt) {
+#ifndef WINDOWS_VERSION
   if (cmdd==0) return use_cdplayer;
   if (use_cdplayer==0) return 0;
   if (cmdd==1) return cd_isplayingaudio(cddrive);
@@ -2902,6 +2947,7 @@ int cd_player_control(int cmdd,int datt) {
     cddrive=cd_driveletters[datt-1];
   }
   else quit("!CDAudio: Unknown command code");
+#endif
   return 0;
 }
 
@@ -3008,7 +3054,7 @@ int run_graph_commandlist(int ct) {
         break;
       case 20: // lose inventory
         if (playerchar->inv[gse->_using]<1)
-          quit("!lose_inventory: doesn\'t have the object");
+          quit("!lose_inventory: doesn't have the object");
         playerchar->inv[gse->_using]--;
         if ((playerchar->activeinv==gse->_using) & (playerchar->inv[gse->_using]<1))
           playerchar->activeinv=-1;
@@ -3388,7 +3434,6 @@ struct DisplayInvItem {
   int sprnum;
   };
 int __actual_invscreen() {
-  int iconsperline;
   write_screen();
 start_actinv:
   DisplayInvItem dii[MAX_INV];
@@ -3637,12 +3682,14 @@ void mainloop() {
   our_eip=7;
   poll_mp3();
   loopcounter++;
+#ifndef WINDOWS_VERSION
   gettime(&t2);
   if (wtimer(t1,t2)>100) {
     gettime(&t1);
     fps=loopcounter-lastcounter;
     lastcounter=loopcounter;
   }
+#endif
   while (timerloop==0) ;
 }
 
@@ -3709,6 +3756,7 @@ void do_main_cycle(int untilwhat,int daaa) {
 
 int init_cd_player()
 {
+#ifndef WINDOWS_VERSION
   use_cdplayer=0;
   numcddrives=cd_installed();
   if (numcddrives==0) return -1;
@@ -3717,19 +3765,24 @@ int init_cd_player()
   cddrive=cd_driveletters[0];
   use_cdplayer=1;
   return 0;
+#else
+  use_cdplayer=0;
+  return -1;
+#endif
 }
 
 //char datname[80]="ac.clb";
 char*ac_config_file="acsetup.cfg";
 char conffilebuf[80];
 
-int main(int argc,char**argv)
-{
-  int ee,bb;
+int main(int argc,char*argv[]) {
   cfopenpriority=2;
+  int ee,bb;
+#ifndef WINDOWS_VERSION
   printf("Adventure Creator v" AC_VERSION_TEXT "Interpreter\n"
          "Copyright (c) 1999 Chris Jones\n"
          "ACI version " ACI_VERSION_TEXT "\n");
+#endif
   if ((argc>1) && (argv[1][1]=='?'))
     return 0;
   debug_flags=0;
@@ -3761,20 +3814,22 @@ int main(int argc,char**argv)
     errcod = csetlib("ac2game.dat","");
   }
   if (errcod!=0) {  // there's a problem
-    printf("Error ST02: could not load game file 'AC2GAME.DAT'.\n");
+    DisplayAlert("Error ST02: could not load game file 'AC2GAME.DAT'.\n");
     if (errcod==-1) { // file not found
-      printf("You must create and save a game first in the Room Editor before you\n"
-             "can use this engine.\n");
+      DisplayAlert("You must create and save a game first in the Room Editor before you\n"
+        "can use this engine.\n");
     } else {
-      printf("The file is corrupt. Make sure you have the correct version of the\n"
-             "Room Editor.\n");
+      DisplayAlert("The file is corrupt. Make sure you have the correct version of the\n"
+        "Room Editor.\n");
     }
     return 8;
   }
   scInit_SeeR();
   allegro_init();
   if (init_cd_player()==0) {
+#ifndef WINDOWS_VERSION
     printf("CD-ROM Audio support enabled.\n");
+#endif
   }
   check_cpu();
   const char*cpu_families[4]={
@@ -3784,27 +3839,32 @@ int main(int argc,char**argv)
     "Pentium Pro"
   };
   if (cpu_family>6) cpu_family=6;
+#ifndef WINDOWS_VERSION
   printf("%s CPU detected.\n", cpu_families[cpu_family-3]);
+#endif
   if (cpu_family<5) usetup.mp3_player=0;
-  if (cpu_family<4) usetup.mod_player=0;
+#ifndef WINDOWS_VERSION
+  if (cpu_family<4)
+#endif
+    usetup.mod_player=0;
   if ((argc>1) && (stricmp(argv[1],"--setup")==0)) {
     run_setup();
     return 0;
   }
   init_language_text("en");
   if (check_write_access()==0) {
-    printf("Unable to write to the current directory. Do not run this game off a\n"
+    DisplayAlert("Unable to write to the current directory. Do not run this game off a\n"
       "network or CD-ROM drive. Also check drive free space (you need 1 Mb free).\n");
     return 6;
   }
   if (minstalled()==0) {
-    printf("This game requires a mouse. You need to load a DOS mouse driver to\n"
+    DisplayAlert("This game requires a mouse. You need to load a DOS mouse driver to\n"
       "play this game. Try typing 'MOUSE'.\n");
     return 3;
   }
   char*memcheck=(char*)malloc(4000000);
   if (memcheck==NULL) {
-    printf("There is not enough memory available to run this game. You need 4 Mb free\n"
+    DisplayAlert("There is not enough memory available to run this game. You need 4 Mb free\n"
       "extended memory to run the game.\n"
       "If you are running from Windows, check the 'DPMI memory' setting on the DOS box\n"
       "properties.\n");
@@ -3818,14 +3878,18 @@ int main(int argc,char**argv)
     roomstats[ee].tsdatasize=0;
     roomstats[ee].tsdata=NULL;
     }
+#ifdef WINDOWS_VERSION
+  install_keyboard();
+#else
   printf("Checking sound inits.\n");
+#endif
   if (usetup.mod_player) reserve_voices(NUM_MOD_DIGI_VOICES+2,-1);
   if (install_sound(usetup.digicard,usetup.midicard,NULL)!=0) {
     reserve_voices(-1,-1);
     opts.mod_player=0;
     opts.mp3_player=0;
     if (install_sound(usetup.digicard,usetup.midicard,NULL)!=0) {
-      printf("\nUnable to initialize your audio hardware.\n"
+      DisplayAlert("\nUnable to initialize your audio hardware.\n"
         "[Problem: %s]\n",allegro_error);
       proper_exit=1;
       return 7;
@@ -3836,7 +3900,7 @@ int main(int argc,char**argv)
     else install_amp();
   }
   if (debug_flags>0) {
-    printf("Engine debugging enabled.\n"
+    DisplayAlert("Engine debugging enabled.\n"
       "\nNOTE: You have selected to enable one or more engine debugging options.\n"
       "These options cause many parts of the game to behave abnormally, and you\n"
       "may not see the game as you are used to it. The point is to test whether\n"
@@ -3847,7 +3911,11 @@ int main(int argc,char**argv)
   }
   our_eip=-10;
   atexit(atexit_handler);
+#ifdef WINDOWS_VERSION
+  srand(time(NULL));
+#else
   srand(time(NULL) % 2000);
+#endif
   init_pathfinder();
   set_gfx_mode(GFX_VGA,320,200,320,200);
   abuf=screen; vesa_xres=320; vesa_yres=200;
@@ -3922,15 +3990,17 @@ int main(int argc,char**argv)
   our_eip=-17;
   if ((ee=load_game_file())!=0) {
     proper_exit=1;
+#ifndef WINDOWS_VERSION
     set_gfx_mode(GFX_TEXT,80,25,0,0);
     printf("Could not load game file.\n(Reason: ");
+#endif
     if (ee==-1)
-      printf("File not found. Please run the Room Editor to create a game first).\n");
+      DisplayAlert("File not found. Please run the Room Editor to create a game first).\n");
     else if (ee==-2)
-      printf("Invalid file format. The file may be corrupt, or from a different\n"
+      DisplayAlert("Invalid file format. The file may be corrupt, or from a different\n"
         "version of Creator).\n");
     else if (ee==-3)
-      printf("Script link failed [error %d]\n-- %s --)\n",scErrorNo,scErrorMsg);
+      DisplayAlert("Script link failed [error %d]\n-- %s --)\n",scErrorNo,scErrorMsg);
     return 6;
   }
   our_eip=-7;
@@ -4019,7 +4089,9 @@ int main(int argc,char**argv)
   our_eip=-3;
   FadeOut(5);
   load_new_room(playerchar->room,playerchar);
+#ifndef WINDOWS_VERSION
   gettime(&t1);
+#endif
   lastcounter=0;
   loopcounter=0;
   main_game_loop();
@@ -4030,3 +4102,7 @@ int main(int argc,char**argv)
   quit("|bye!");
   return 0;
 }
+
+#ifdef WINDOWS_VERSION
+END_OF_MAIN()
+#endif

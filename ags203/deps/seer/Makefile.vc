@@ -1,0 +1,54 @@
+# building for msvc
+
+DEST_CC  = MSVC
+DEST_OS  = WIN32
+DEST_CPU = INTEL
+
+#****library objs
+
+OBJECTS = vars.obj compiler.obj expr.obj declare.obj initial.obj parser.obj \
+  preproc.obj dict.obj consts.obj vcpucode.obj vcpudeco.obj instance.obj \
+  callasm.obj pmem.obj script.obj protect.obj headers.obj
+
+OBJs = $(addprefix $(OBJ_DIR)/, $(OBJECTS))
+LIBs = kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib \
+       shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib
+DEFFILE = $(SRC_DIR)/seer.def
+
+CFLAGS = /nologo
+
+ifdef Debug
+LIBc = $(LIB_DIR)/seerd.dll
+Optim = /Od
+CFLAGS += /Gd /Zi /MTd
+MACROS = /DDEBUG
+else
+LIBc = $(LIB_DIR)/seer.dll
+Optim = /Ox
+CFLAGS += /Gd /Ox /GB /MT
+MACROS =
+endif
+
+ifdef Profile
+CFLAGS += /Gh
+endif
+
+ifdef Optimize
+Optim = /O2
+endif
+
+MACROS = /DWIN32
+CFLAGS += $(Optim) $(MACROS)
+LFLAGS = /nologo /subsystem:windows /machine:I386
+
+#****************************************************************
+
+#****link dynamic library
+
+$(LIBc): $(OBJs)
+	$(LD) $(LFLAGS) /dll /def:$(DEFFILE) /out:$(LIBc) $(OBJs) $(LIBs)
+
+#****compile
+
+$(OBJ_DIR)/%.obj: $(SRC_DIR)/%.c
+	$(CC) /c $(CFLAGS) -I. /Fo$@ $<

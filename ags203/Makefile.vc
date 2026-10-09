@@ -1,0 +1,101 @@
+# makefile for msvc (windows) version
+
+TARGET = $(BIN_DIR)/acwin.exe
+BASE_BIN = orig/acwin.exe
+BASE_SYMBOLS = orig/acwin_symbols.txt
+
+##########################################
+
+ifdef WINEPREFIX
+export WINEPREFIX
+endif
+
+export WINE  ?= wine
+export CC    := $(WINE) cl
+export CXX   := $(CC)
+export RC    := $(WINE) rc
+export LD    := $(WINE) link
+export VCLIB := $(WINE) lib
+
+export TOOLCHAIN
+
+MAKE = make --no-print-directory
+
+SRCS = \
+	ac.cpp \
+	acdialog.cpp \
+	aclang.cpp \
+	acwsetup.cpp \
+	Clib32.cpp \
+	libamp.cpp \
+	lzw.cpp \
+	mousew32.cpp \
+	routefnd.cpp \
+	scriptrt.cpp
+
+OBJS = $(SRCS:.cpp=.obj)
+
+OBJS_DIR = $(addprefix $(OBJ_DIR)/,$(OBJS))
+
+LIBS = kernel32.lib user32.lib seer.lib alleg.lib
+
+DEPS = \
+	$(LIB_DIR)/alleg.lib \
+	$(LIB_DIR)/seer.lib \
+	$(INC_DIR)/libamp.h \
+	$(INC_DIR)/jgmod.h
+
+##########################################
+
+MSVC  := $(MSVC_DIR)/vc98
+MSDEV := $(MSVC_DIR)/common/msdev98
+DXSDK := $(MSVC_DIR)/DIRX6SDK.98
+
+MSVC_D  := $(shell winepath -w "$(MSVC)")
+MSDEV_D := $(shell winepath -w "$(MSDEV)")
+DXSDK_D := $(shell winepath -w "$(DXSDK)")
+
+# export WINEDEBUG=warn+all
+export WINEPATH := $(MSVC_D)\bin;$(MSDEV_D)\bin
+export PATH := $(MSVC)/bin:$(PATH)
+
+export INCLUDE := $(DXSDK_D)\include;$(MSVC_D)\atl\include;$(MSVC_D)\include;$(MSVC_D)\mfc\include
+export LIB := $(DXSDK_D)\lib;$(MSVC_D)\lib;$(MSVC_D)\mfc\lib
+
+APPVER = 4.0
+
+# NOTE: "Standard" edition of MSVC6 ignores optimization flags
+CFLAGS = /W3 /O2 /Ob1 /ML /DWIN32 /nologo /I$(INC_DIR) /I$(SRC_DIR)
+LFLAGS = /nologo /subsystem:windows,$(APPVER) /incremental:no /libpath:"$(LIB_DIR)"
+LFLAGS += /opt:ref,icf
+# LFLAGS += /debug
+
+.PHONY: allegro seer
+
+allegro: $(LIB_DIR)/alleg.lib
+seer: $(LIB_DIR)/seer.lib
+
+$(TARGET): $(DEPS) $(OBJS_DIR)
+	$(LD) $(LFLAGS) /out:$(TARGET) $(OBJS_DIR) $(LIBS)
+	@cp -f $(LIB_DIR)/*.dll $(BIN_DIR)/
+
+$(OBJ_DIR)/%.obj: $(SRC_DIR)/%.cpp
+	$(CXX) /c $(CFLAGS) /Fo$@ $<
+
+$(LIB_DIR)/alleg.lib:
+	@$(MAKE) -C $(DEP_DIR)/all3927
+	@cp -f $(DEP_DIR)/all3927/lib/all3927.dll $(LIB_DIR)/
+	@cp -f $(DEP_DIR)/all3927/lib/alleg.lib $(LIB_DIR)/
+	@cp -f -r $(DEP_DIR)/all3927/include/* $(INC_DIR)/
+
+$(LIB_DIR)/seer.lib:
+	@$(MAKE) -C $(DEP_DIR)/seer
+	@cp -f $(DEP_DIR)/seer/lib/seer.dll $(LIB_DIR)/
+	@cp -f $(DEP_DIR)/seer/lib/seer.lib $(LIB_DIR)/
+	@cp -f $(DEP_DIR)/seer/seer.h $(INC_DIR)/
+
+$(INC_DIR)/libamp.h:
+	@cp -f $(DEP_DIR)/libamp/src/libamp.h $(INC_DIR)/
+
+$(INC_DIR)/jgmod.h:
+	@cp -f $(DEP_DIR)/jgmod/src/jgmod.h $(INC_DIR)/

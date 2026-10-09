@@ -1,9 +1,5 @@
-# removed everything except static library building
+# static library building for djgpp
 
-OBJ_DIR = obj
-SRC_DIR = src
-
-LIB_DIR = lib
 LIB_NAME = $(LIB_DIR)/libjgmod.a
 
 OBJ_LIST = \
@@ -26,12 +22,6 @@ CFLAGS += -Isrc -I../allegro
 ifndef CROSS
 CFLAGS += -m486
 endif
-
-.PHONY: all lib
-
-all : $(LIB_NAME)
-
-lib : $(LIB_NAME)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -o $@ -c $<

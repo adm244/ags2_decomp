@@ -78,7 +78,14 @@ const int MISC_COND=MAX_OBJ*4+NUMOTCON+MAX_INIT_SPR*4;
 #define OBJECT_ON     13
 #define RUN_DIALOG    14
 
+#ifdef DJGPP
 #include <unistd.h>
+#endif
+
+#ifdef _MSC_VER
+#undef VTA_LEFT
+#undef VTA_RIGHT
+#endif
 
 
 // thisroom.options[0] = startup music
@@ -88,6 +95,7 @@ const int MISC_COND=MAX_OBJ*4+NUMOTCON+MAX_INIT_SPR*4;
 //                 [4] = music volume (0=normal, <0 quiter, >0 louder)
 
 const int ST_TUNE = 0, ST_SAVELOAD = 1, ST_MANDISABLED = 2, ST_MANVIEW = 3, ST_VOLUME = 4;
+
 #ifndef CROOM_NOFUNCTIONS
 char *croom_h_copyright = "ChrisRoom v2.00 - CRM reader/writer copyright (c) 1995, 1998, 1999 by Chris Jones.";
 char *game_file_sig = "Adventure Creator Game File v2";
@@ -143,6 +151,15 @@ void quit(char*);
 #else
 #define PCKD
 #endif
+
+struct SpritesFolder {
+  int   count;
+  short sprites[120];
+  short parent;
+  char  name[20];
+  };
+
+#pragma pack(1)
 struct sprstruc {
   short sprnum PCKD;  // number from array
   short x,y   PCKD;    // x,y co-ords
@@ -151,19 +168,13 @@ struct sprstruc {
   sprstruc() { on=0; }
   };
 
-struct SpritesFolder {
-  int count;
-  short sprites[120];
-  short parent;
-  char name[20];
-  };
-
 #define MSG_DISPLAYNEXT 1   // supersedes using alt-200 at end of message
 #define MSG_TIMELIMIT   2
 struct MessageInfo {
   char displayas PCKD;   // 0=normal window, 1=as speech
   char flags PCKD;  // combination of MSG_xxx flags
   };
+#pragma pack()
 
 #define AE_WAITFLAG 0x80000000
 #define MAXANIMSTAGES 10
@@ -359,7 +370,7 @@ struct room_file_header {
   short version PCKD;
   };
 
-#ifdef DJGPP
+#if defined(DJGPP) || defined(_MSC_VER)
 extern void lzwcompress(FILE*,FILE*);
 extern void lzwexpand(FILE*,FILE*);
 extern long maxsize,outbytes,putbytes;
@@ -951,6 +962,7 @@ void load_room(char *files, roomstruct *rstruc) {
 }
 #endif  // NOFUNCTIONS
 
+#pragma pack(1)
 struct ScriptEvent {
   long type     PCKD;   // eg. display message, or if is less
   char sort     PCKD;
@@ -967,6 +979,7 @@ struct ScriptBlock {
   long        numevents           PCKD;
   ScriptEvent events[MAXINBLOCK]  PCKD;
 };
+#pragma pack()
 
 #define VFLG_FLIPSPRITE 1
 

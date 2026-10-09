@@ -1,0 +1,96 @@
+# removed docs, tests, plugins and example programs from building
+# modified to be compatable with our "build system"
+
+#
+#  Shared makefile for building the Allegro library. Requires GNU make.
+# 
+#  Available options:
+#
+#     Environment variables:
+#        DEBUGMODE=1       selects a debug build.
+#        PROFILEMODE=1     selects a profiling build.
+#        WARNMODE=1        selects strict compiler warnings.
+#        STATICLINK=1      use static linking (MSVC only).
+#        PGCC=1            use PGCC compiler switches (djgpp only).
+#        CROSSCOMPILE=1    build djgpp version under Linux (djgpp only).
+#        ALLEGRO_USE_C=1   use C drawing code instead of asm (djgpp only).
+#
+#     Targets: 
+#        all:              build all versions and programs.
+#        lib:              build a single library only, no programs.
+
+MAKEFILE_INC = Makefile.vc
+
+# -------- version number for use in the DLL filename --------
+
+LIBRARY_VERSION = 3927
+
+# -------- check environment to see what type of library to build --------
+
+ifdef DEBUGMODE
+
+# -------- build a debugging library --------
+VERSION = alld
+SHORT_VERSION = ald
+VERY_SHORT_VERSION = ad
+DESCRIPTION = debugging
+
+else
+ifdef PROFILEMODE
+
+# -------- build a profiling library --------
+VERSION = allp
+SHORT_VERSION = alp
+VERY_SHORT_VERSION = ap
+DESCRIPTION = profiling
+
+else
+
+# -------- build a release library --------
+VERSION = alleg
+SHORT_VERSION = all
+VERY_SHORT_VERSION = al
+DESCRIPTION = optimised
+
+endif
+endif
+
+# -------- list of what files we need to build --------
+
+include Makefile.lst
+
+COMMON_OBJECTS = $(basename $(notdir $(ALLEGRO_SRC_FILES)))
+C_OBJECTS = $(basename $(notdir $(ALLEGRO_SRC_C_FILES)))
+I386_OBJECTS = $(basename $(notdir $(ALLEGRO_SRC_I386_FILES)))
+
+# -------- include platform-specific definitions --------
+
+include $(MAKEFILE_INC)
+
+# -------- list what objects we need to build --------
+
+VPATH += src
+
+OBJECTS = $(addprefix $(OBJ_DIR)/, $(addsuffix $(OBJ), $(OBJECT_LIST)))
+
+# -------- top level boss targets like "default" and "all" --------
+
+.PHONY: all msg lib
+
+.PRECIOUS: $(OBJ_DIR)/%$(OBJ)
+
+all: msg lib
+	@echo The $(DESCRIPTION) $(PLATFORM) library has been compiled.
+
+msg:
+	@echo Compiling Allegro for $(PLATFORM), $(DESCRIPTION). Please wait...
+
+lib: $(LIB_NAME)
+
+# NOTE: use static def file for compatability with original dll
+$(DEFFILE):
+# 	@./fixdll.sh
+	@cp src/allegro.def $(DEFFILE)
+
+$(LIB_NAME): $(OBJECTS) $(DEFFILE)
+	$(MAKE_LIB)

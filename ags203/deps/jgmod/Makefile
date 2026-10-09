@@ -1,6 +1,10 @@
-# wrapper around modified JGMOD 0.99 DJGPP makefile
+# wrapper around modified JGMOD 0.99 makefile
 
 PARAMS =
+
+ifdef DEBUG
+PRARMS += Debug=1
+endif
 
 ifdef CROSS
 PARAMS += CROSS=1
@@ -12,7 +16,7 @@ all: static
 
 static:
 	@echo Building JGMOD...
-	@make -f Makefile.dj lib $(PARAMS)
+	@make -f Makefile.all lib $(PARAMS)
 	@echo Done!
 
 clean:

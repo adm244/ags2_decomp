@@ -1,0 +1,2 @@
+# exclude original acwin.exe from ignore
+!acwin.exe

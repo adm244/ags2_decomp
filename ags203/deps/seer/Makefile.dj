@@ -1,0 +1,118 @@
+# building for djgpp
+
+DEST_CC  = GCC
+DEST_OS  = DOS
+DEST_CPU = INTEL
+
+#only on Intel
+ifeq ($(DEST_CPU),INTEL)
+ifeq ($(DEST_OS),LINUX)
+#I've quite old Slackware with old gcc (without -m486).
+#You can try removing that (or changing to -mpentium)
+Machine = -m486
+else
+Machine = -mpentium
+endif
+else
+#no special machine specification for non-intel compatible
+Machine =
+endif
+
+ifdef CROSS
+Machine =
+endif
+
+#****library objs
+
+OBJECTS = vars.o compiler.o expr.o declare.o initial.o parser.o preproc.o dict.o \
+          consts.o vcpucode.o vcpudeco.o instance.o callasm.o pmem.o script.o \
+          protect.o headers.o
+
+OBJs = $(addprefix $(OBJ_DIR)/, $(OBJECTS))
+
+#****program objs
+
+ifdef Debug
+LIBc = $(LIB_DIR)/libseerd.a
+else
+LIBc = $(LIB_DIR)/libseer.a
+endif
+
+#****Compilation parameters
+ifdef Profile
+PRO=-pg
+else
+PRO=
+endif
+
+Optim=-O6
+
+ifdef Optimize
+  ifdef PGCC
+  FLAGS = -Wall -s $(Machine) $(Optim) -ffast-math -fomit-frame-pointer
+  SAFEFLAG= -Wall -s $(Machine) -O -ffast-math -fomit-frame-pointer
+  else
+  FLAGS=-Wall -s $(Machine) $(Optim) -ffast-math -fomit-frame-pointer
+  SAFEFLAGS=-Wall -s $(Machine) -O -ffast-math
+  endif
+LINK=-Wall -s
+else
+
+  ifdef Debug
+  FLAGS=-Wall -g $(Machine)
+  SAFEFLAGS=-Wall -g $(Machine)
+  LINK=-Wall -g $(Machine)
+  else
+   ifdef Profile
+   FLAGS=-Wall $(Machine)
+   SAFEFLAGS=-Wall $(Machine)
+   LINK=-Wall $(Machine)
+   else
+   FLAGS=-Wall -s $(Machine)
+   SAFEFLAGS=-Wall -s $(Machine)
+   LINK=-Wall -s $(Machine)
+   endif
+  endif
+
+endif
+
+ifdef Debug
+MACROS = -DDEBUG -DSC_$(DEST_OS) -DSC_$(DEST_CC) -DSC_$(DEST_CPU)
+else
+MACROS = -DSC_$(DEST_OS) -DSC_$(DEST_CC) -DSC_$(DEST_CPU)
+endif
+
+ifdef DEST_NASM
+MACROS += -DSC_NASM
+endif
+
+#****compiler and linker:
+AR = ar rs
+
+ifdef CROSS
+WFLAGS = -Wno-unused-but-set-variable -Wno-trigraphs
+FLAGS += $(WFLAGS)
+SAFEFLAGS += $(WFLAGS)
+else
+ifeq ($(DEST_CC),GCC)
+CC=gcc
+else
+CC=cc
+endif
+endif # CROSS
+
+FLAGS += -g
+
+#****************************************************************
+
+#****link library:
+$(LIBc): $(OBJs)
+	$(AR) $(LIBc) $(OBJs)
+
+#****compile
+
+$(OBJ_DIR)/callasm.o: $(SRC_DIR)/callasm.c
+	$(CC) $(SAFEFLAGS) -c $(MACROS) $(PRO) -I. -o $@ $<
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+	$(CC) $(FLAGS) $(MACROS) $(PRO) -I. -c -o $@ $<

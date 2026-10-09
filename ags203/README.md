@@ -34,11 +34,9 @@ Build: 2.03.039\
 Date: 24 November 1999 at 21:56:48
 
 - Windows: 95 (4.0)
-- Visual C++: 6.0 Build 8168
+- Visual C++: 6.0 Build 8168 (Professional)
 - Allegro: 3.9.27 WIP (MSVC)
 - SeeR: 0.94a
-- JGMOD: ??
-- libamp: ??
 
 "Rich" header data extracted from Windows PE of `acwin.exe`:
 

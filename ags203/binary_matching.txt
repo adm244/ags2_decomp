@@ -1,4 +1,6 @@
 DONE:
+
+TODO:
 vga256
 wsetmode
 wgetmode
@@ -84,7 +86,7 @@ main_loop_until
 (*) run_animation_stage
 run_animation
 setevent
-process_event
+(**) process_event
 processallevents
 set_mouse_cursor
 set_default_cursor
