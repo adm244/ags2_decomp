@@ -1,6 +1,6 @@
 # GCC 2 instruction macthing notes
 
-These notes describe GCC 2 compiler and standard libs behavior. Might be specific to DJGPP.
+These notes describe GCC 2 compiler, ABI and standard libs behavior. Might be specific to DJGPP.
 
 ## General notes
 
@@ -25,6 +25,10 @@ These notes describe GCC 2 compiler and standard libs behavior. Might be specifi
 * Changing operand order can impact the entire function. The order of memory accesses in a single expression may increase register pressure, forcing the compiler to rely on excessive stack-based operations.
 
 * Splitting a single expression into multiple ones produces different instructions.
+
+* Virtual functions table is appended to the end of a class as the last member (incompatible with MSVC which inserts it as the first member).
+
+* The structure of virtual functions table is also different, it has some 4-bytes data (a pointer?) before a function pointer (incompatible with MSVC which has just functions pointers).
 
 ## Continue and Break
 
