@@ -853,7 +853,8 @@ void run_animation_stage(AnimationStruct*stage) {
 void run_animation(FullAnimation*anim,int stage) {
   int ee;
 
-  if (restrict_until==0) {
+  if (restrict_until!=0) ;
+  else {
     for (ee=stage;ee<anim->numstages;ee++) {
       run_animation_stage(&anim->stage[ee]);
       if (restrict_until) {
@@ -862,7 +863,7 @@ void run_animation(FullAnimation*anim,int stage) {
         user_disabled_for=UNTIL_ANIMEND;
         break;
       }
-      if (/* ??? */ 0) break;
+      if (restrict_until) break;
     }
   }
 }

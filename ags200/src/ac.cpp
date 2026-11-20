@@ -583,7 +583,7 @@ void load_new_room(int newnum,CharacterInfo*forchar) {
     }
   }
   // convert background to current res
-  if (sxmult==thisroom.resolution) ;
+  if (thisroom.resolution==sxmult) ;
   else thisroom.bscene=fix_bitmap_size(thisroom.bscene);
     // fix walk-behinds to current screen resolution
   thisroom.object=fix_bitmap_size(thisroom.object);
@@ -737,7 +737,7 @@ void run_animation_stage(AnimationStruct*stage) {
   char buf[200];
   if (stage->action==0) quit("!undefined animation command");
   if (stage->object==MANOBJNUM) ;
-  else if (stage->object>9)
+  else if (stage->object>=10)
     quit("!invalid object number specified for animation. must be 0-9 or 99.");
   if (stage->action==1) { // set object view
     if (stage->data==0) stage->data=playerchar->defview;
@@ -788,16 +788,17 @@ void run_animation_stage(AnimationStruct*stage) {
 void run_animation(FullAnimation*anim,int stage) {
   int ee;
 
-  if (restrict_until==0) {
+  if (restrict_until!=0) ;
+  else {
     for (ee=stage;ee<anim->numstages;ee++) {
       run_animation_stage(&anim->stage[ee]);
       if (restrict_until) {
-        user_disabled_for=UNTIL_ANIMEND;
         user_disabled_data=(int)anim;
         user_disabled_data2=ee+1;
+        user_disabled_for=UNTIL_ANIMEND;
         break;
       }
-      if (/* ??? */ 0) break;
+      if (restrict_until) break;
     }
   }
 }
@@ -850,7 +851,7 @@ void processallevents(int numev,EventHappened*evlist) {
   inside_processevent++;
   for (dd=0;dd<numev;dd++) {
     process_event(&evlist[dd]);
-    if (in_new_room!=0) continue;
+    if (in_new_room!=0) break;
   }
   inside_processevent--;
 }
@@ -1235,7 +1236,7 @@ void draw_interface(InterfaceElement*iep,int ienum) {
       int wid,hit;
       for (wid=0;wid<images[pic]->w;wid++) { // grid pattern
         for (hit=wid%2;hit<images[pic]->h;hit+=2)
-          _putpixel(abuf,tdxp+wid,tdyp+hit,16);
+          putpixel(abuf,tdxp+wid,tdyp+hit,16);
       }
     }
   }
@@ -1329,10 +1330,11 @@ void draw_screen_background() {
   }
   wputblock(-offsetx,-offsety,thisroom.bscene,0);
   clear_sprite_list();
+  int useindx;
   // draw objects
   for (aa=0;aa<croom->numobj;aa++) {
     if (objs[aa].on==0) continue;
-    int useindx=aa;
+    useindx=aa;
     if (actsps[useindx]!=NULL) wfreeblock(actsps[useindx]);
     atxp=objs[aa].x*sxmult-offsetx;
     atyp=objs[aa].y*symult-spriteheight[objs[aa].num]-offsety;
@@ -1346,7 +1348,7 @@ void draw_screen_background() {
   for (aa=0;aa<game.numcharacters;aa++) {
     if (game.chars[aa].on==0) continue;
     if (game.chars[aa].room!=displayed_room) continue;
-    int useindx=aa+MAX_INIT_SPR;
+    useindx=aa+MAX_INIT_SPR;
     if (actsps[useindx]!=NULL) wfreeblock(actsps[useindx]);
     CharacterInfo*chin=&game.chars[aa];
     sppic=views[chin->view].frames[chin->loop][chin->frame].pic;
@@ -1423,7 +1425,7 @@ void update_screen() {
     lastmx=mousex; lastmy=mousey;
   }
 
-  int mwasaty=mousey, mwasatx=mousex;
+  int mwasatx=mousex,mwasaty=mousey;
   domouse(1);
   abuf=screen;
   wputblock(0,0,virtual_screen,0);
@@ -1431,7 +1433,7 @@ void update_screen() {
   domouse(2);
   moffsx=offsetx+mousex;
   moffsy=offsety+mousey;
-  if ((mwasaty!=mousey) | (mwasatx!=mousex)) {
+  if ((mwasatx!=mousex) | (mwasaty!=mousey)) {
     int onhs=getpixel(thisroom.lookat,moffsx/sxmult,moffsy/symult);
     setevent(EV_RUNEVBLOCK,EVB_HOTSPOT,onhs,6);
   }
@@ -1647,7 +1649,7 @@ void break_up_text_into_lines(int wii,int fonnt,char *todis) {
       if (win[0]==0) done=1;
       int chr=win[0]; win[0]=0;
       int cutline=0;
-      if (wii<=wgettextwidth(theline,fonts[fonnt])) cutline=1;
+      if (wgettextwidth(theline,fonts[fonnt])>=wii) cutline=1;
       if (chr=='[') cutline=1;
       if (cutline) {
         if (!done) win[0]=' ';
@@ -1676,7 +1678,7 @@ void break_up_text_into_lines(int wii,int fonnt,char *todis) {
   longestline=0;
   int rr;
   for (rr=0;rr<numlines;rr++) {
-    if (longestline<wgettextwidth(lines[rr],fonts[fonnt]))
+    if (wgettextwidth(lines[rr],fonts[fonnt])>longestline)
       longestline=wgettextwidth(lines[rr],fonts[fonnt]);
   }
 }
@@ -2035,8 +2037,7 @@ void run_event_block(EventBlock*evpt,int evnt,int invnum) {
     else if ((invnum>=0) && (evpt->data[ee]==0))
       quit("!ProcessEvent: An inventory event was used, but the Data column\n"
         "was not set. See section 6.1 in the documentation for information.");
-    else ;
-    if ((invnum>=0) && (evpt->data[ee]!=invnum)) continue;
+    else if ((invnum>=0) && (evpt->data[ee]!=invnum)) continue;
     if ((invnum>=0) & (invnum<MAX_INV-1)) {
       playerchar->inv[invnum]--;
       if (playerchar->inv[invnum]==0) {
@@ -2064,7 +2065,7 @@ void run_event_block(EventBlock*evpt,int evnt,int invnum) {
         else if (edge==3) edge=4; // bottom->top
         else edge=3; // top->bottom
         new_room_pos=edge*1000;
-        if (edge<=2) new_room_pos+=playerchar->y;
+        if (edge<3) new_room_pos+=playerchar->y;
         else new_room_pos+=playerchar->x;
       }
       NewRoom(evpt->respondval[ee]);
@@ -2126,7 +2127,7 @@ int check_click_on_object(int xx,int yy,int mood) {
     if (objs[aa].on==0) continue;
     int xxx=objs[aa].x,yyy=objs[aa].y;
     if (isposinbox(xx,yy,xxx,yyy-spriteheight[objs[aa].num]/symult,
-      spritewidth[objs[aa].num]/sxmult+xxx,yyy)==0) ;
+      spritewidth[objs[aa].num]/sxmult+xxx,yyy)==FALSE) ;
     else {
       int passon=-1,cdata=-1;
       if (mood==MODE_LOOK) passon=0;
@@ -2135,8 +2136,8 @@ int check_click_on_object(int xx,int yy,int mood) {
       else if (mood==MODE_USE) { passon=3;
         cdata=playerchar->activeinv; }
       if (passon>=0) { evblockbasename="object%d"; evblocknum=aa;
-        run_event_block(&croom->objcond[aa],passon,cdata);
-        return 1; }
+        run_event_block(&croom->objcond[aa],passon,cdata); }
+      return 1;
     }
   }
   return 0;
@@ -2408,7 +2409,7 @@ void FileRead(FILE*haa,char*toread) {
   }
 
 void InterfaceOn(int ifn) {
-  if (ifn<=0)
+  if (ifn<1)
     quit("!InterfaceOn: invalid interface specified");
   ifn--;
   game.iface[ifn].on=1;
@@ -2417,7 +2418,7 @@ void InterfaceOn(int ifn) {
 }
 
 void InterfaceOff(int ifn) {
-  if (ifn<=0)
+  if (ifn<1)
     quit("!InterfaceOff: invalid interface specified");
   ifn--;
   game.iface[ifn].on=0;
@@ -2618,7 +2619,7 @@ void script_debug(int cmdd) {
       int ww,hh;
       for (ww=0;ww<tempw->w;ww++) {
         for (hh=0;hh<tempw->h;hh++) {
-          if (_getpixel(tempw,ww,hh)!=0)
+          if (_getpixel(tempw,ww,hh)>0)
             _putpixel(tempw,ww,hh,1);
         }
       }
@@ -2719,12 +2720,12 @@ int run_graph_commandlist(int ct) {
       /*case 10: // run text script
         break;*/
       case 11: // set flag
-        if ((gse->_using>14) & (gse->_using<100))
+        if ((gse->_using>=15) & (gse->_using<100))
           quit("!graph_script: SET_FLAG used with invalid flag number");
         set_graph_variable(gse->_using,1);
         break;
       case 12: // clear flag
-        if ((gse->_using>14) & (gse->_using<100))
+        if ((gse->_using>=15) & (gse->_using<100))
           quit("!graph_script: CLEAR_FLAG used with invalid flag number");
         set_graph_variable(gse->_using,0);
         break;

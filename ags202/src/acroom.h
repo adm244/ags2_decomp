@@ -921,11 +921,12 @@ void load_room(char *files, roomstruct *rstruc) {
       fread(&bloklen, 4, 1, opty);
       bloklen += ftell(opty);  // make it the new position for after block read
 
-      long lee;
-      int hh;
       if (thisblock == BLOCKTYPE_MAIN)
         load_main_block(rstruc, files, opty, rfh);
       else if (thisblock == BLOCKTYPE_SCRIPT) {
+        long lee;
+        int hh;
+
         fread(&lee, 4, 1, opty);
         rstruc->scripts = (char *)malloc(lee + 5);
         fread(rstruc->scripts, lee, 1, opty);
@@ -935,6 +936,8 @@ void load_room(char *files, roomstruct *rstruc) {
           rstruc->scripts[hh] += passwencstring[hh % 11];
       }
       else if (thisblock == BLOCKTYPE_COMPSCRIPT) {
+        int hh;
+
         fread(&hh, 4, 1, opty);
         rstruc->compiled_script = (scScript)malloc(hh + 5);
         fread(rstruc->compiled_script, hh, 1, opty);

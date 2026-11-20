@@ -14,7 +14,6 @@
 #define CROOM_NOFUNCTIONS
 #include "acroom.h"
 #include <string.h>
-#include <math.h>
 
 #define MAXPATHBACK 1000
 int *pathbackx, *pathbacky;
@@ -81,7 +80,7 @@ int is_route_possible(int fromx, int fromy, int tox, int toy, block wss)
   int dd, ff;
   for (dd = 0; dd < tempw->w; dd++) {
     for (ff = 0; ff < tempw->h; ff++) {
-      if (_getpixel(tempw, dd, ff) != 0)
+      if (_getpixel(tempw, dd, ff) > 0)
         _putpixel(tempw, dd, ff, 1);
     }
   }
@@ -96,7 +95,7 @@ int is_route_possible(int fromx, int fromy, int tox, int toy, block wss)
         if (getpixel(tempw, ex, ey) != 232)
           continue;
 
-        thisis = sqrt(fix((double)((ex - tox) * (ex - tox) + (ey - toy) * (ey - toy))));
+        thisis = sqrt((double)((ex - tox) * (ex - tox) + (ey - toy) * (ey - toy)));
         if (thisis < nearest)
         {
           nearest = thisis;
