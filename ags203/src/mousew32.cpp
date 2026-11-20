@@ -154,19 +154,18 @@ int mgetbutton()
 {
   int toret = NONE;
   poll_mouse();
-  int butis = mouse_b;
 
-  if ((butis > 0) & (butwas > 0))
+  if ((mouse_b > 0) & (butwas > 0))
     return NONE;  // don't allow holding button down
 
-  if (butis & 1)
+  if (mouse_b & 1)
     toret = LEFT;
-  else if (butis & 2)
+  if (mouse_b & 2)
     toret = RIGHT;
-  else if (butis & 4)
+  if (mouse_b & 4)
     toret = MIDDLE;
 
-  butwas = butis;
+  butwas = mouse_b;
   return toret;
 }
 
@@ -202,11 +201,8 @@ void msethotspot(int xx, int yy)
 int minstalled()
 {
   int nbuts;
-  if ((nbuts = install_mouse()) < 1)
+  if ((nbuts = install_mouse()) < 2)
     return 0;
-
-  if (nbuts < 2)
-    nbuts = 2;
 
   return nbuts;
 }

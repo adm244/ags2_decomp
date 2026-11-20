@@ -54,6 +54,9 @@ void load_graphical_scripts(FILE*iii,roomstruct*rst) {
   while (1) {
     fread(&ct,4,1,iii);
     if ((ct==-1) | (feof(iii)!=0)) break;
+#ifdef WINDOWS_VERSION
+    if ((ct>=5) & (rst->wasversion<7)) ct+=2;
+#endif
     long lee;
     fread(&lee,4,1,iii);
     char thisscn[20];

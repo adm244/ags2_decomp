@@ -50,7 +50,7 @@ decrypt_text
 freadmissout
 add_to_eventblock
 load_main_block
-load_room
+(**) load_room
 INIerror
 INIeof
 INIreadchar
@@ -80,14 +80,14 @@ FadeOut
 my_fade_in
 (*) fix_bitmap_size
 (*) save_room_data_segment
-(*) load_new_room
+(**) (*) load_new_room
 new_room
 main_loop_until
-(*) run_animation_stage
-run_animation
+(**) (*) run_animation_stage
+(**) run_animation
 setevent
 (**) process_event
-processallevents
+(**) processallevents
 set_mouse_cursor
 set_default_cursor
 find_next_enabled_cursor
@@ -96,21 +96,21 @@ enable_cursor_mode
 disable_cursor_mode
 remove_popup_interface
 process_interface_click
-offset_over_inv
+(**) offset_over_inv
 run_event_block_inv
 check_controls
 fix_player_sprite
 (*) update_stuff
 (*) printtext
 update_invorder
-(*) draw_interface
+(**) (*) draw_interface
 sort_out_walk_behinds
 clear_sprite_list
 add_to_sprite_list
 draw_sprite_list
-draw_screen_background
+(**) draw_screen_background
 draw_topbar
-update_screen
+(**) update_screen
 (*) atexit_handler
 (*) quit
 setup_sierra_interface
@@ -118,7 +118,7 @@ setup_sierra_interface
 poll_mp3
 do_corner
 draw_button_background
-(*) break_up_text_into_lines
+(**) (*) break_up_text_into_lines
 ensure_text_valid
 _display_at
 DisplayAt
@@ -143,12 +143,12 @@ play_sound
 play_audio_clip_by_index
 add_inventory
 RunDialog
-run_event_block
+(**) run_event_block
 isposinbox
-check_click_on_object
+(**) check_click_on_object
 is_pos_on_character
 check_click_on_character
-(*) move_object
+(**) (*) move_object
 (*) walk_character
 ProcessClick
 (*) do_movelist_move
@@ -161,8 +161,8 @@ FileOpen
 FileClose
 FileWrite
 FileRead
-InterfaceOn
-InterfaceOff
+(**) InterfaceOn
+(**) InterfaceOff
 IsGamePaused
 NewRoom
 (*) NewRoomEx
@@ -188,12 +188,12 @@ MoveCharacterToObject
 (*) MoveCharacterToHotspot
 StopMoving
 GetLanguageString
-script_debug
+(**) script_debug
 cd_player_control
 _sc_strcat
 get_graph_variable
 set_graph_variable
-(*) run_graph_commandlist
+(**) (*) run_graph_commandlist
 fget_long
 run_graph_script
 run_dialog_request
@@ -232,11 +232,11 @@ CSCIDrawWindow
 CSCIEraseWindow
 checkcontrols
 finddefaultcontrol
-CSCIWaitMessage
+(**) CSCIWaitMessage
 CSCICreateControl
 CSCIDeleteControl
 CSCISendControlMessage
-preparesavegamelist
+(**) preparesavegamelist
 loadgamedialog
 enternumberwindow
 savegamedialog
@@ -265,7 +265,7 @@ _processmessage__10PushButtoniil
 _pressedon__10PushButton
 _draw__10PushButton
 _drawandmouse__10NewControl
-get_language_text
+(**) get_language_text
 init_language_text
 draw_box
 restore_backup_line
@@ -314,7 +314,7 @@ ismouseinbox
 mfreemem
 mnewcursor
 mloadwcursor
-mgetbutton
+(**) mgetbutton
 mbutrelease
 misbuttondown
 mgetbuttonmask
@@ -327,12 +327,12 @@ mchangestyle
 mshow
 mhide
 msethotspot
-minstalled
+(**) minstalled
 minst
 init_pathfinder
 line_callback
 can_see_from
-is_route_possible
+(**) is_route_possible
 try_this_square
 __find_route
 find_route
@@ -340,4 +340,4 @@ getlong
 save_script_configuration
 load_script_configuration
 save_graphical_scripts
-load_graphical_scripts
+(**) load_graphical_scripts

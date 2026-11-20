@@ -27,16 +27,14 @@ char*get_language_text(int indxx)
   lang_read_count++;
   if (fff==NULL) quit("Language file not found. Version may be out of date.");
   lang_text[0]=0;
-  char buffr[200];
-  int idx;
-  for (;;) {
-try_again:
-    if (feof(fff)) goto notfound;
+  while (feof(fff)==0) {
+    char buffr[200];
     fgets(buffr,199,fff);
-    if (strnicmp(buffr,"end_of_file",5)==0) goto notfound;
-    if (buffr[0]==';') goto try_again;
+    if (strnicmp(buffr,"end_of_file",5)==0) break;
+    if (buffr[0]==';') continue;
+    int idx;
     sscanf(buffr,"%d %[^\n]s",&idx,lang_text);
-    if (idx!=indxx) goto try_again;
+    if (idx!=indxx) continue;
     while (lang_text[strlen(lang_text)-1]=='\\') {
       sprintf(lang_text+(strlen(lang_text)-1),"\n");
       fgets(lang_text+strlen(lang_text),100,fff);
@@ -45,7 +43,6 @@ try_again:
     fclose(fff);
     return lang_text;
   }
-notfound:
   fclose(fff);
   return "[language string not found]";
 }

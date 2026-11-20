@@ -54,18 +54,23 @@ Date: 24 November 1999 at 21:56:48
 
 ## Changes
 
-Functions added: 4
+Functions added: 8
 ```
+my_readkey
 __sc_displayspeech
 move_object
 NewRoomEx
 MoveObject
+findfirst
+findclose
+findnext
 ```
 
-Functions modified: 26
+Functions modified: 31
 ```
 allocall
 load_room
+run_setup
 prepare_text_script
 post_script_cleanup
 fix_bitmap_size
@@ -85,11 +90,15 @@ walk_character
 do_movelist_move
 SetPlayerCharacter
 MoveCharacterToHotspot
+cd_player_control
 run_graph_commandlist
 setup_script_exports
 mainloop
 main_game_loop
+init_cd_player
 main
+preparesavegamelist
+load_graphical_scripts
 ```
 
 ## Links

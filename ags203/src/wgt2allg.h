@@ -499,21 +499,6 @@ extern "C"
     return 0;                   // 0 = incorrect   ! = 0 correct
   }
 
-// #ifdef WINDOWS_VERSION
-//   void gettime(struct time *tpt)
-//   {
-//     time_t ltt;
-//     struct tm *tis;
-
-//     time(&ltt);
-//     tis = localtime(&ltt);
-//     tpt->ti_sec = tis->tm_sec;
-//     tpt->ti_min = tis->tm_min;
-//     tpt->ti_hour = tis->tm_hour;
-//     tpt->ti_hund = 0;
-//   }
-// #endif
-
   long wtimer(struct time tt1, struct time tt2)
   {
     long timm1 = tt1.ti_hund + (long)tt1.ti_sec * 100 + (long)tt1.ti_min * 6000 + (long)tt1.ti_hour * 6000 * 60;

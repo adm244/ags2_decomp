@@ -9,6 +9,12 @@
 #include <dir.h>
 #endif
 
+#ifdef WINDOWS_VERSION
+#define getch() (readkey() & 0x00ff)
+#undef kbhit
+#define kbhit keypressed
+#endif
+
 const int NONE=-1,LEFT=0,RIGHT=1;
 
 #define MSG_OK            25
@@ -819,6 +825,9 @@ void preparesavegamelist(int ctrllist)
     numsaves++;
     don=findnext(&ffb);
   }
+#ifdef WINDOWS_VERSION
+  findclose();
+#endif
   if (numsaves>=MAXSAVEGAMES)
     toomanygames=1;
   for (nn=0;nn<numsaves-1;nn++) {
