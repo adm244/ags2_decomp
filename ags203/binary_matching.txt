@@ -1,6 +1,4 @@
 DONE:
-
-TODO:
 vga256
 wsetmode
 wgetmode
@@ -14,7 +12,7 @@ getshort
 wloadblock
 wloadsprites
 wfreesprites
-wsavesprites
+(+) wsavesprites
 wloadfont
 wtextbackground
 wtexttransparent
@@ -314,7 +312,7 @@ ismouseinbox
 mfreemem
 mnewcursor
 mloadwcursor
-(**) mgetbutton
+mgetbutton
 mbutrelease
 misbuttondown
 mgetbuttonmask
@@ -327,7 +325,7 @@ mchangestyle
 mshow
 mhide
 msethotspot
-(**) minstalled
+minstalled
 minst
 init_pathfinder
 line_callback
@@ -341,3 +339,5 @@ save_script_configuration
 load_script_configuration
 save_graphical_scripts
 (**) load_graphical_scripts
+
+TODO:

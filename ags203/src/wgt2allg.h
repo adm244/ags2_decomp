@@ -285,12 +285,12 @@ extern "C"
   {
     FILE *ooo = fopen(fnm, "wb");
     short topu = 4;
-    int aa, lastsp = 0;
-    char *spsig = " Sprite File ";
 
     fwrite(&topu, 2, 1, ooo);
+    char *spsig = " Sprite File ";
     fwrite(spsig, 13, 1, ooo);
 
+    int aa, lastsp = 0;
     for (aa = 0; aa < 256; aa++)
       fwrite(&pll[aa], 3, 1, ooo);
 
