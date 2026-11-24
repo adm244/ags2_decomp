@@ -1,0 +1,108 @@
+# removed docs, tests, plugins and example programs from building
+
+#
+#  Rules for building the Allegro library with MSVC. This file is included
+#  by the primary makefile, and should not be used directly.
+#
+
+# -------- define some variables that the primary makefile will use --------
+
+PLATFORM = MSVC
+EXE = .exe
+OBJ = .obj
+
+OBJ_DIR = obj
+
+ifdef STATICLINK
+
+# -------- link as a static library --------
+IMPLIB_BASENAME = $(VERSION)_s.lib
+IMPLIB_NAME = lib/$(IMPLIB_BASENAME)
+LIB_NAME = $(IMPLIB_NAME)
+
+else
+
+# -------- link as a DLL --------
+DLL_BASENAME = $(SHORT_VERSION)$(LIBRARY_VERSION).dll
+DLL_NAME = lib/$(DLL_BASENAME)
+IMPLIB_BASENAME = $(VERSION).lib
+IMPLIB_NAME = lib/$(IMPLIB_BASENAME)
+LIB_NAME = $(DLL_NAME)
+
+endif
+
+# -------- decide what compiler options to use --------
+
+ifdef WARNMODE
+WFLAGS = -W3 -WX
+else
+WFLAGS = -W1
+endif
+
+ifdef DEBUGMODE
+
+# -------- debugging build --------
+CFLAGS = -DDEBUGMODE=$(DEBUGMODE) $(WFLAGS) -Gd -Zi -MTd
+SFLAGS = -DDEBUGMODE=$(DEBUGMODE) -Wall
+LFLAGS = -debug -debugtype:cv
+
+else
+ifdef PROFILEMODE
+
+# -------- profiling build --------
+CFLAGS = $(WFLAGS) -Gd -Ox -GB -MT
+SFLAGS = -Wall
+LFLAGS = -profile
+
+else
+
+# -------- optimised build --------
+CFLAGS = $(WFLAGS) -Gd -Ox -GB -MT
+SFLAGS = -Wall
+LFLAGS = -release
+
+endif
+endif
+
+# NOTE: original build system depended on host (GCC2) assembler;
+#       we don't have time for this nonsense, just use C version
+CFLAGS += -DALLEGRO_USE_C
+
+# -------- list platform specific objects --------
+
+VPATH = src/win src/c src/misc
+
+OBJECT_LIST = $(COMMON_OBJECTS) $(C_OBJECTS) \
+	$(basename $(notdir $(ALLEGRO_SRC_WIN_FILES)))
+
+LIBRARIES = kernel32.lib user32.lib gdi32.lib comdlg32.lib ole32.lib \
+	dinput.lib ddraw.lib dxguid.lib winmm.lib dsound.lib
+
+# -------- finally, we get to the fun part... --------
+
+DEFFILE := lib/allegro.def
+
+ifdef STATICLINK
+
+# -------- link as a static library --------
+define MAKE_LIB
+$(LD) -nologo -out:$(LIB_NAME) $(OBJECTS)
+endef
+
+COMPILE_FLAGS = -DALLEGRO_STATICLINK
+
+else
+
+# -------- link as a DLL --------
+define MAKE_LIB
+$(LD) -nologo $(LFLAGS) -dll -def:$(DEFFILE) -out:$(DLL_NAME) -implib:$(IMPLIB_NAME) $(OBJECTS) $(LIBRARIES)
+endef
+
+endif
+
+GCC2MSVC = -D_MSC_VER -D_WIN32 -D_M_IX86 -U__GNUC__ -UDJGPP
+
+COMPILE_FLAGS += $(subst src/,-DALLEGRO_SRC ,$(findstring src/, $<))$(CFLAGS)
+
+$(OBJ_DIR)/%.obj: %.c
+	$(CC) -nologo $(COMPILE_FLAGS) -I. -I./include -Fo$@ -c $<

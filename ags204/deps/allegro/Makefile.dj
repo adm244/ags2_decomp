@@ -1,0 +1,207 @@
+# removed docs, tests and example programs from building
+# modified to allow cross-compilation with GCC 4.x
+
+#################################################
+#                                               #
+#     Allegro makefile, by Shawn Hargreaves     #
+#                                               #
+#     The 'clean' and 'uninstall' targets       #
+#     require rm from the fileutils package     #
+#                                               #
+#################################################
+
+# replace this definition if you are using PGCC
+# PGCC=1
+
+.PHONY: baddjgpp baddjdev badgcc badbnu badmake badtxi badpath badalleg
+
+ifndef CROSS
+
+# check that the DJGPP environment variable is set
+ifndef DJDIR
+baddjgpp:
+	@echo Your DJGPP environment variable is not set correctly! It should
+	@echo point to the djgpp.env file: see the djgpp readme.1st for details.
+endif
+
+# check that the djdev package is installed
+ifeq ($(wildcard $(DJDIR)/bin/djasm.exe),)
+baddjdev:
+	@echo Missing djgpp package! You need to install djdev201.zip (or whatever the
+	@echo latest version is). Download this from wherever you got djgpp, and unzip
+	@echo it into the root of your djgpp directory.
+endif
+
+# check that the gcc package is installed
+ifeq ($(wildcard $(DJDIR)/bin/gcc.exe),)
+badgcc:
+	@echo Missing djgpp package! You need to install gcc2721b.zip (or whatever the
+	@echo latest version is). Download this from wherever you got djgpp, and unzip
+	@echo it into the root of your djgpp directory.
+endif
+
+# check that the binutils package is installed
+ifeq ($(wildcard $(DJDIR)/bin/ld.exe),)
+badbnu:
+	@echo Missing djgpp package! You need to install bnu27b.zip (or whatever the
+	@echo latest version is). Download this from wherever you got djgpp, and unzip
+	@echo it into the root of your djgpp directory.
+endif
+
+# check that the make package is installed
+ifeq ($(wildcard $(DJDIR)/bin/make.exe),)
+badmake:
+	@echo Missing djgpp package! You need to install mak3761b.zip (or whatever the
+	@echo latest version is). Download this from wherever you got djgpp, and unzip
+	@echo it into the root of your djgpp directory.
+endif
+
+# check that djgpp/bin is pathed
+ifeq ($(wildcard $(addsuffix /djasm.exe,$(subst ;, ,$(PATH)))),)
+badpath:
+	@echo Your PATH is not set correctly! This must include the
+	@echo djgpp bin directory: see the djgpp readme.1st for details.
+endif
+
+endif # CROSS
+
+# set some useful paths
+OBJ = obj
+DOBJ = obj
+LIB = lib/liballeg.a
+INTERNAL_H = src/internal.h src/djgpp/interndj.h
+
+WFLAGS = -Wall -W -Werror -Wno-unused
+
+ifdef CROSS
+WFLAGS += -Wno-missing-field-initializers -Wno-implicit-function-declaration \
+	-Wno-sign-compare -Wno-unused-parameter -Wno-pointer-sign -Wno-sequence-point \
+	-Wno-ignored-qualifiers -Wno-attributes
+endif
+
+ifdef DEBUGMODE
+# build a debug version
+OFLAGS = -g
+
+else
+ifdef PROFILEMODE
+# build with profiling information
+ifdef PGCC
+OFLAGS = -pg -mpentium -O6 -ffast-math
+else
+OFLAGS = -pg -O3 -ffast-math
+ifndef CROSS
+OFLAGS += -m486
+endif
+endif
+
+else
+# build a normal optimised version
+ifdef PGCC
+OFLAGS = -mpentium -O6 -ffast-math -fomit-frame-pointer
+else
+OFLAGS = -g3 -O3 -ffast-math -fomit-frame-pointer
+ifndef CROSS
+OFLAGS += -m486
+endif
+endif
+
+endif
+endif
+
+CFLAGS = -I. -Isrc -I$(OBJ) $(WFLAGS) $(OFLAGS)
+SFLAGS = -I. -Isrc -I$(OBJ) $(WFLAGS)
+
+VPATH = src src/djgpp
+
+SYSOBJS = adlib.o awedata.o bank.o dma.o dpmi.o emu8k.o emu8kmid.o \
+	  essaudio.o gpro.o gus.o irq.o irqwrap.o joystd.o keyboard.o \
+	  mouse.o mpu.o sb.o snespad.o sw.o timer.o vbeaf.o vbeafex.o vesa.o
+
+OBJS = allegro.o blit.o blit8.o blit16.o blit24.o blit32.o bmp.o cblend15.o \
+       cblend16.o clip3d.o colblend.o color.o config.o cpu.o datafile.o \
+       dataregi.o digmid.o dither.o file.o fli.o flood.o fsel.o gfx.o \
+       gfx8.o gfx15.o gfx16.o gfx24.o gfx32.o gfxdrv.o graphics.o gsprite.o \
+       gui.o guiproc.o inline.o joystick.o joydrv.o lbm.o math.o math3d.o \
+       midi.o misc.o mixer.o modesel.o modex.o pcx.o poly3d.o polygon.o \
+       quantize.o readbmp.o scanline.o snddrv.o sound.o spline.o sprite.o \
+       sprite8.o sprite15.o sprite16.o sprite24.o sprite32.o stream.o \
+       stretch.o text.o tga.o vga.o vtable.o vtable8.o vtable15.o vtable16.o \
+       vtable24.o vtable32.o xgfx.o $(SYSOBJS)
+
+LIB_OBJS = $(addprefix $(OBJ)/, $(OBJS))
+
+.PRECIOUS: $(OBJ)/%.o
+
+.PHONY: all lib clean mmxtest
+
+all: lib
+
+lib: $(LIB)
+
+$(OBJ)/%.o: %.c allegro.h
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+$(OBJ)/%.o: %.S asmdefs.inc $(OBJ)/asmdef.inc
+	$(CC) $(SFLAGS) -o $@ -c $<
+
+$(OBJ)/%.o: %.s asmdefs.inc $(OBJ)/asmdef.inc
+	$(CC) -x assembler-with-cpp $(SFLAGS) -o $@ -c $<
+
+ifdef CROSS
+
+# just use hard-coded inc file for simplicity
+$(OBJ)/asmdef.inc:
+	@cp -f src/asmdef.inc $(OBJ)/asmdef.inc
+
+else
+
+$(OBJ)/asmdef.inc: $(OBJ)/asmdef.exe
+	$(OBJ)/asmdef.exe $(OBJ)/asmdef.inc
+
+$(OBJ)/asmdef.exe: src/asmdef.c allegro.h $(INTERNAL_H)
+	$(CC) $(CFLAGS) $(LFLAGS) -o $@ src/asmdef.c
+
+endif # CROSS
+
+mmxtest:
+	@echo > $(DOBJ)/mmx.h
+	@echo .text > $(DOBJ)/mmxtest.s
+	@echo emms >> $(DOBJ)/mmxtest.s
+	@$(CC) -c $(OBJ)/mmxtest.s -o $(OBJ)/mmxtest.o
+	@echo #define ALLEGRO_MMX > $(DOBJ)/mmx.h
+	@echo Your assembler supports MMX instructions!
+
+$(OBJ)/mmx.h:
+	@echo Testing for MMX assembler support...
+	@-make mmxtest
+
+$(LIB): $(LIB_OBJS)
+	$(AR) rs $(LIB) $(LIB_OBJS)
+
+clean:
+	-$(RM) -v obj/*.* lib/*.*
+
+$(OBJ)/adlib.o: fm_instr.h
+$(OBJ)/irq.o: asmdefs.inc $(OBJ)/asmdef.inc
+$(OBJ)/sprite.o $(OBJ)/stretch.o: opcodes.h
+$(OBJ)/emu8k.o $(OBJ)/emu8kmid.o: emu8k.h
+$(OBJ)/dat.o $(OBJ)/datedit.o $(OBJ)/dat2s.o $(OBJ)/grabber.o $(OBJ)/pat2dat.o $(PLUGIN_OBJS): datedit.h
+$(OBJ)/datedit.o: $(OBJ)/plugins.h
+$(OBJ)/blit8.o $(OBJ)/blit16.o $(OBJ)/blit24.o $(OBJ)/blit32.o: blit.inc
+$(OBJ)/sprite8.o $(OBJ)/sprite15.o $(OBJ)/sprite16.o $(OBJ)/sprite24.o $(OBJ)/sprite32.o: sprite.inc
+$(OBJ)/scanline.o $(OBJ)/poly3d.o: $(OBJ)/mmx.h
+$(OBJ)/datafile.o: datafile.h
+$(OBJ)/dataregi.o: datafile.h
+
+INTERNAL_DEPS = adlib.o afinfo.o allegro.o blit.o bmp.o clip3d.o config.o \
+		cpu.o datedit.o datafile.o dataregi.o digmid.o dma.o \
+		essaudio.o file.o fli.o flood.o gfx.o grabber.o graphics.o \
+		gui.o guiproc.o gus.o inline.o irq.o joystd.o joystick.o \
+		keyboard.o keyconf.o lbm.o midi.o mixer.o modex.o mouse.o \
+		mpu.o pat2dat.o pcx.o polygon.o readbmp.o sb.o setup.o \
+		sprite.o sound.o spline.o stream.o text.o tga.o timer.o \
+		vbeaf.o vbeafex.o vesa.o vga.o vtable8.o vtable15.o \
+		vtable16.o vtable24.o vtable32.o
+
+$(addprefix $(OBJ)/, $(INTERNAL_DEPS)): $(INTERNAL_H)

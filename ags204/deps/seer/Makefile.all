@@ -1,0 +1,20 @@
+# DEST_OS  LINUX,DOS,WIN32,FREEBSD,BEOS,UNIXWARE,SCOUNIX
+# DEST_CPU INTEL,ANY
+# DEST_CC  GCC,MSVC,ANY
+
+OBJ_DIR = obj
+SRC_DIR = src
+LIB_DIR = lib
+
+ifeq ($(TOOLCHAIN),djgpp)
+MAKEFILE_INC = Makefile.dj
+endif
+ifeq ($(TOOLCHAIN),msvc)
+MAKEFILE_INC = Makefile.vc
+endif
+
+include $(MAKEFILE_INC)
+
+.PHONY: all
+
+all: $(LIBc)

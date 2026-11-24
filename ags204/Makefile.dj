@@ -1,0 +1,91 @@
+# makefile for djgpp (dos) version
+
+TARGET = $(BIN_DIR)/ac.exe
+BASE_BIN = orig/ac.coff
+BASE_SYMBOLS = orig/ac_symbols.txt
+
+##########################################
+
+ifdef DJGPP_DIR
+CC = $(DJGPP_DIR)/bin/i586-pc-msdosdjgpp-gcc
+CXX = $(DJGPP_DIR)/bin/i586-pc-msdosdjgpp-g++
+CROSS = 1
+endif
+
+export TOOLCHAIN
+
+MAKE = make --no-print-directory \
+	CC=$(CC) CXX=$(CXX) \
+	CROSS=$(CROSS)
+
+SRCS = \
+	ac.cpp \
+	acdialog.cpp \
+	aclang.cpp \
+	acsetup.cpp \
+	cdrom32.cpp \
+	Clib32.cpp \
+	lzw.cpp \
+	mouse32.cpp \
+	routefnd.cpp \
+	scriptrt.cpp
+
+OBJS = $(SRCS:.cpp=.o)
+
+OBJS_DIR = $(addprefix $(OBJ_DIR)/,$(OBJS))
+
+# order matters
+LIBS = -lamp -lalleg -ljgmod -lseer
+
+DEPS = \
+	$(LIB_DIR)/liballeg.a \
+	$(LIB_DIR)/libamp.a \
+	$(LIB_DIR)/libjgmod.a \
+	$(LIB_DIR)/libseer.a
+
+##########################################
+
+DEFINES = 
+WFLAGS = -Wno-unused -Wno-write-strings -Wno-sign-compare -Wno-char-subscripts
+
+CFLAGS = -W -Wall $(WFLAGS) -I$(INC_DIR) -I$(SRC_DIR) $(DEFINES)
+CPPFLAGS = 
+LDFLAGS = -L$(LIB_DIR)
+
+ifdef CROSS
+WFLAGS += -Wno-unused-parameter -Wno-attributes -Wno-delete-non-virtual-dtor -Wno-empty-body
+CFLAGS += -fpermissive -fmax-errors=5
+endif
+
+.PHONY: allegro jgmod libamp seer
+
+allegro: $(LIB_DIR)/liballeg.a
+jgmod: $(LIB_DIR)/libjgmod.a
+libamp: $(LIB_DIR)/libamp.a
+seer: $(LIB_DIR)/libseer.a
+
+$(TARGET): $(DEPS) $(OBJS_DIR)
+	$(CXX) -o $(TARGET) $(OBJS_DIR) $(LDFLAGS) $(LIBS)
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+	$(CXX) -c $(CFLAGS) $(CPPFLAGS) -o $@ $<
+
+$(LIB_DIR)/liballeg.a:
+	@$(MAKE) -C $(DEP_DIR)/allegro
+	@cp -f $(DEP_DIR)/allegro/lib/liballeg.a $(LIB_DIR)/
+	@cp -f $(DEP_DIR)/allegro/allegro.h $(INC_DIR)/
+
+$(LIB_DIR)/libjgmod.a:
+	@$(MAKE) -C $(DEP_DIR)/jgmod
+	@cp -f $(DEP_DIR)/jgmod/lib/libjgmod.a $(LIB_DIR)/
+	@cp -f $(DEP_DIR)/jgmod/src/jgmod.h $(INC_DIR)/
+
+$(LIB_DIR)/libamp.a:
+	@$(MAKE) -C $(DEP_DIR)/libamp
+	@cp -f $(DEP_DIR)/libamp/lib/libamp.a $(LIB_DIR)/
+	@cp -f $(DEP_DIR)/libamp/src/libamp.h $(INC_DIR)/
+
+$(LIB_DIR)/libseer.a:
+	@$(MAKE) -C $(DEP_DIR)/seer
+	@cp -f $(DEP_DIR)/seer/lib/libseer.a $(LIB_DIR)/
+	@cp -f $(DEP_DIR)/seer/seer.h $(INC_DIR)/

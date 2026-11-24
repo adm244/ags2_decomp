@@ -1,0 +1,20 @@
+# removed everything except static library building
+
+OBJ_DIR = obj
+SRC_DIR = src
+LIB_DIR = lib
+
+ifeq ($(TOOLCHAIN),djgpp)
+MAKEFILE_INC = Makefile.dj
+endif
+ifeq ($(TOOLCHAIN),msvc)
+MAKEFILE_INC = Makefile.vc
+endif
+
+include $(MAKEFILE_INC)
+
+.PHONY: all lib
+
+all: $(LIB_NAME)
+
+lib: $(LIB_NAME)
