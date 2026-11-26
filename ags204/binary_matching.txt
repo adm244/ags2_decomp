@@ -1,6 +1,4 @@
 DONE:
-
-TODO:
 vga256
 wsetmode
 wgetmode
@@ -148,7 +146,7 @@ add_inventory
 RunDialog
 (*) run_event_block
 isposinbox
-(*) is_pos_in_sprite
+(???) (*) is_pos_in_sprite
 (*) check_click_on_object
 (*) is_pos_on_character
 check_click_on_character
@@ -345,3 +343,5 @@ save_script_configuration
 load_script_configuration
 save_graphical_scripts
 load_graphical_scripts
+
+TODO:

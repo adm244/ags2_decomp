@@ -609,12 +609,20 @@ void save_room(char*files,roomstruct rstruc) {
     }
 
     if (rstruc.compiled_script != NULL) {
-      fputc(BLOCKTYPE_COMPSCRIPT, opty);
+      fputc(BLOCKTYPE_COMPSCRIPT2, opty);
       lee = rstruc.cscriptsize + 4;
       fwrite(&lee, 4, 1, opty);
       lee -= 4;
       fwrite(&lee, 4, 1, opty);
       fwrite(rstruc.compiled_script, lee, 1, opty);
+    }
+
+    if (rstruc.numsprs > 0) {
+      fputc(BLOCKTYPE_OBJECTNAMES, opty);
+      lee = rstruc.numsprs * MAXOBJNAMELEN + 1;
+      fwrite(&lee, 4, 1, opty);
+      fputc(rstruc.numsprs, opty);
+      fwrite(&rstruc.objectnames[0][0], MAXOBJNAMELEN, rstruc.numsprs, opty);
     }
 
     fputc(BLOCKTYPE_EOF, opty);
@@ -906,6 +914,8 @@ void load_room(char *files, roomstruct *rstruc) {
     rstruc->compiled_script = NULL;
   }
 
+  memset (&rstruc->objectnames[0][0], 0, MAX_INIT_SPR * MAXOBJNAMELEN);
+
   opty = clibfopen(files, "rb");
   if (opty == NULL)
     quit("Load_Room: File not found");
@@ -957,6 +967,12 @@ void load_room(char *files, roomstruct *rstruc) {
       }
       else if (thisblock == BLOCKTYPE_COMPSCRIPT)
         quit("Load_room: old room format. Please upgrade the room.");
+      else if (thisblock == BLOCKTYPE_OBJECTNAMES) {
+        if (fgetc(opty) != rstruc->numsprs)
+          quit("Load_room: inconsistent blocks for object names");
+
+        fread(&rstruc->objectnames[0][0], MAXOBJNAMELEN, rstruc->numsprs, opty);
+      }
       else
         quit("Load_room: Unknown block type encountered");
 

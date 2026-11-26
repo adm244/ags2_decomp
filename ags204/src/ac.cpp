@@ -114,15 +114,17 @@ ViewStruct*views=NULL;
 ScriptMouse scmouse;
 ScriptSystem scsystem;
 block _old_screen=NULL;
-block screenop = NULL;
 int user_disabled_for=0,user_disabled_data=0,user_disabled_data2=0;
 int user_disabled_data3=0;
+int is_complete_overlay=0,is_text_overlay=0;
+// Sierra-style speech settings
+int face_talking=-1,facetalkview=0,facetalkwait=0,facetalkframe=0;
 DialogTopic *dialog;
 char*messages[900];
-int _global_x_offset=-1, _global_y_offset=0;
-int screen_state=0;
 int ccSymOffset=0;
+ScreenOverlay screenover[MAX_SCREEN_OVERLAYS];
 int proper_exit=0,our_eip=0;
+int numscreenover=0;
 int scaddr=0;
 #define DBG_NOIFACE       1
 #define DBG_NODRAWSPRITES 2
@@ -130,6 +132,8 @@ int scaddr=0;
 #define DBG_NOUPDATE      8
 #define DBG_NOSFX      0x10
 #define DBG_NOMUSIC    0x20
+#define DBG_NOSCRIPT   0x40
+#define DBG_DBGSCRIPT  0x80
 #define MAXEVENTS 15
 EventHappened event[MAXEVENTS];
 int numevents=0;
@@ -532,6 +536,11 @@ void post_script_cleanup() {
 
 int run_text_script(scInstance*sci,char*tsname) {
   int toret=prepare_text_script(sci,tsname);
+  if ((toret!=0) & (sci==roominst)) {
+    char displbuf[200];
+    sprintf(displbuf,"prepare_script: error occured: %d (%s)",toret,scErrorMsg);
+    quit(displbuf);
+  }
   if (toret!=0) return toret;
   toret=scCall_Instance(sci,ccSymOffset);
   post_script_cleanup();
@@ -553,6 +562,38 @@ int run_text_script_2iparam(scInstance*sci,char*tsname,int iparam,int param2) {
   post_script_cleanup();
   return toret;
 }
+
+void remove_screen_overlay(int type) {
+  int cc,dd;
+  for (cc=0;cc<numscreenover;cc++) {
+    if (screenover[cc].type==type) ;
+    else if (type==-1) ;
+    else continue;
+    if (screenover[cc].pic!=NULL)
+      wfreeblock(screenover[cc].pic);
+    screenover[cc].pic=NULL;
+    if (screenover[cc].type==OVER_COMPLETE) is_complete_overlay--;
+    if (screenover[cc].type==OVER_TEXTMSG) is_text_overlay--;
+    numscreenover--;
+    for (dd=cc;dd<numscreenover;dd++)
+      screenover[dd]=screenover[dd+1];
+    cc--;
+  }
+}
+
+int add_screen_overlay(int x,int y,int type,block piccy) {
+  if (numscreenover>=MAX_SCREEN_OVERLAYS)
+    quit("too many screen overlays created");
+  if (type==OVER_COMPLETE) is_complete_overlay++;
+  if (type==OVER_TEXTMSG) is_text_overlay++;
+  screenover[numscreenover].pic=piccy;
+  screenover[numscreenover].x=x;
+  screenover[numscreenover].y=y;
+  screenover[numscreenover].type=type;
+  screenover[numscreenover].timeout=0;
+  numscreenover++;
+  return numscreenover-1;
+  }
 
 void my_fade_from_range(PALLETE source,PALLETE dest,int speed,int from,int to) {
   PALLETE temp;
@@ -691,7 +732,8 @@ void load_new_room(int newnum,CharacterInfo*forchar) {
     forchar->walking=0;
   }
   roominst=NULL;
-  if (thisroom.compiled_script!=NULL) {
+  if (debug_flags & DBG_NOSCRIPT) ;
+  else if (thisroom.compiled_script!=NULL) {
     roominst=scCreate_Instance(thisroom.compiled_script,"");
     if (croom->tsdatasize>0) {
       if (croom->tsdatasize!=ToCodeINT(roominst)[hdrDataSize])
@@ -771,6 +813,7 @@ void load_new_room(int newnum,CharacterInfo*forchar) {
     }
   update_music_volume();
   new_room_flags=0;
+  remove_screen_overlay(-1);
   play.gscript_timer=-1;  // avoid screw-ups with changing screens
   // trash any input which they might have done while it was loading
   while (kbhit()) { getch(); }
@@ -1034,7 +1077,7 @@ void check_controls() {
   int ll;
   for (ll=0;ll<game.numiface;ll++) {
     if (game.iface[ll].popup!=POPUP_MOUSEY) continue;
-    if (screen_state==2) break;  // interfaces disabled
+    if (is_complete_overlay>0) break;  // interfaces disabled
     if (game.iface[ll].on==0) continue;
     if (ifacepopped==ll) continue;
     if (mousey < game.iface[ll].popupyp) {
@@ -1090,14 +1133,9 @@ void check_controls() {
         mouse_pushed_iface=pushedie;
     }
     else {
-      if (screen_state==1) {
+      if (is_text_overlay>0) {
         if (game.options[OPT_NOSKIPTEXT]!=0) ;
-        else {
-          screen_state=0;
-          _global_x_offset=-1;
-          wfreeblock(screenop);
-          screenop=NULL;
-        }
+        else remove_screen_overlay(OVER_TEXTMSG);
       }
       else if (play.disabled_user_interface!=0) ;
       else setevent(EV_TEXTSCRIPT,TS_MCLICK,ll+1,0);
@@ -1107,17 +1145,10 @@ void check_controls() {
   if (kbhit()) {
     int kgn = getch();
     if (kgn==0) kgn=getch()+300;
-//    if (kgn==2) { Display("Crashing"); strcpy(NULL, NULL); }
-    //if (kgn==2) Display("Some for�ign text");
-    //if (kgn==2) do_conversation(5);
     if ((kgn>='a') & (kgn<='z')) kgn-=32;
-    if (kgn==367) restart_game();
-    if (screen_state==1) {
-      screen_state=0;
-      _global_x_offset=-1;
-      wfreeblock(screenop);
-      screenop=NULL;
-    }
+//    if (kgn==367) restart_game();
+    if (kgn==2) Display("numover: %d character movesped: %d, animspd: %d",numscreenover,playerchar->walkspeed,playerchar->animspeed);
+    if (is_text_overlay>0) remove_screen_overlay(OVER_TEXTMSG);
     else setevent(EV_TEXTSCRIPT,TS_KEYPRESS,kgn);
   }
   int edge=-1;
@@ -1229,11 +1260,18 @@ void update_stuff() {
   if (play.messagetime>=0) {
     play.messagetime--;
     if (play.messagetime<1)
-    {
-      wfreeblock(screenop);
-      screenop=NULL;
-      screen_state=0;
-      _global_x_offset=-1;
+      remove_screen_overlay(OVER_TEXTMSG);
+  }
+  // update sierra-style speech
+  if (face_talking>=0) {
+    if (facetalkwait>0) facetalkwait--;
+    else {
+      facetalkframe++;
+      if (facetalkframe>=views[facetalkview].numframes[0])
+        facetalkframe=0;
+      facetalkwait=views[facetalkview].frames[0][facetalkframe].speed+5;
+      clear(screenover[face_talking].pic);
+      draw_sprite(screenover[face_talking].pic,images[views[facetalkview].frames[0][facetalkframe].pic],0,0);
     }
   }
   if (play.gscript_timer>0) play.gscript_timer--;
@@ -1479,7 +1517,7 @@ void draw_screen_background() {
   int aa,zoom_level,widd,hitt;
   int onarea,sppic;
   int atxp,atyp;
-  if (screen_state==2) return;
+  if (is_complete_overlay!=0) return;
   if ((thisroom.width>320) | (thisroom.height>200)) {
     offsetx=playerchar->x*sxmult-scrnwid/2;
     offsety=playerchar->y*symult-scrnhit/2;
@@ -1569,15 +1607,16 @@ void draw_screen_background() {
 }
 
 void draw_topbar() {
-  if ((ifacepopped>=0) & (screen_state!=2)) {
+  int gg;
+  for (gg=0;gg<numscreenover;gg++) {
+    wputblock(screenover[gg].x,screenover[gg].y,screenover[gg].pic,1);
+  }
+  if ((ifacepopped>=0) & (is_complete_overlay==0)) {
     draw_interface(&game.iface[ifacepopped],ifacepopped);
     int wasoniface=ifacepopped;
     if (mousey>game.iface[ifacepopped].y2) ifacepopped=-1;
     if (ifacepopped==-1) remove_popup_interface(wasoniface);
   }
-
-  if (_global_x_offset>=0)
-    wputblock(_global_x_offset,_global_y_offset,screenop,1);
 }
 
 // update_screen: copies the contents of the virtual screen to the actual
@@ -1820,8 +1859,11 @@ void draw_button_background(int xx1,int yy1,int xx2,int yy2,InterfaceElement*iep
     rect(abuf,xx1,yy1,xx2,yy2,0);
     }
   else {
-    wsetcolor(iep->bgcol);
+    if (iep->bgcol>=0) wsetcolor(iep->bgcol);
+    else wsetcolor(0); // black backrgnd behind picture
     wbar(xx1,yy1,xx2,yy2);
+    if (iep->bgcol<0)
+      wputblock(xx1,yy1,images[-iep->bgcol],0);
     int uu;
     for (uu=yy1;uu<=yy2;uu+=spriteheight[iep->button[4].pic]) {
       do_corner(iep->button[4].pic,xx1,uu,-1,0);   // left side
@@ -1914,11 +1956,11 @@ void _display_at(int xx,int yy,int wii,char*todis,int blocking,int asspch) {
   }
   else if (xx<0) xx=scrnwid/2-wii/2;
   wtextcolor(15);
-  if (screenop!=NULL) wfreeblock(screenop);
-  screenop=create_bitmap(wii,numlines*texthit+6);
+  remove_screen_overlay(OVER_TEXTMSG);
+  int ee;
+  block screenop=create_bitmap(wii,numlines*texthit+6);
   wsetscreen(screenop); clear(screenop);
   clear_to_color(abuf,0);
-  int ee;
   if (asspch) {
     for (ee=0;ee<numlines;ee++) {
       int ttxp=wii/2 - wgettextwidth(lines[ee],fonts[usingfont])/2;
@@ -1955,15 +1997,12 @@ void _display_at(int xx,int yy,int wii,char*todis,int blocking,int asspch) {
         wgtprintf(xoffs+3,yoffs+3+ee*texthit,fonts[usingfont],lines[ee]);
     }
   }
-  _global_x_offset=xx;
-  _global_y_offset=yy;
-  screen_state=1;
+  add_screen_overlay(xx,yy,OVER_TEXTMSG,screenop);
   wsetscreen(virtual_screen);
   if (blocking) {
     write_screen();
     wputblock(xx,yy,screenop,0);
-    screen_state=0;
-    _global_x_offset=-1;
+    remove_screen_overlay(OVER_TEXTMSG);
     domouse(1);
     while (1) {
       domouse(0);
@@ -2006,6 +2045,7 @@ void DisplaySpeech(char*texx,int askip,int aschar) {
   int widd=scrnwid/2+scrnwid/4;
   int tdxp=-1,tdyp=-1;
   int oldview=-1;
+  block closeupface=NULL;
   if (game.chars[aschar].room==displayed_room) {
     tdxp=game.chars[aschar].x*sxmult-offsetx;
     if (tdxp<2) tdxp=2;
@@ -2013,7 +2053,30 @@ void DisplaySpeech(char*texx,int askip,int aschar) {
     tdyp=game.chars[aschar].y*symult-spriteheight[sppic]-offsety-25;
     if (tdyp<5) tdyp=5;
     tdxp=-tdxp;  // tell it to centre it
-    if (game.chars[aschar].talkview>=0) {
+    if ((game.chars[aschar].talkview>=0) && (game.options[OPT_SPEECHTYPE]==1)) {
+      // Sierra-style close-up portrait
+      int bigx=0,bigy=0,kk;
+      ViewStruct*viptr=&views[game.chars[aschar].talkview];
+      for (kk=0;kk<viptr->numframes[0];kk++) {
+        int tw=spritewidth[viptr->frames[0][kk].pic];
+        if (tw>bigx) bigx=tw;
+        tw=spriteheight[viptr->frames[0][kk].pic];
+        if (tw>bigy) bigy=tw;
+      }
+      closeupface=create_bitmap(bigx+1,bigy+1);
+      clear(closeupface);
+      draw_sprite(closeupface,images[viptr->frames[0][0].pic],0,0);
+      face_talking=add_screen_overlay(10,20,OVER_PICTURE,closeupface);
+      facetalkframe=0;
+      facetalkwait=viptr->frames[0][0].speed+5;
+      facetalkview=game.chars[aschar].talkview;
+      tdxp=bigx+15;
+      tdyp=23;
+      if (widd>315-tdxp)
+        widd=315-tdxp;
+    }
+    else if (game.chars[aschar].talkview>=0) {
+      // Lucasarts-style speech
       oldview=game.chars[aschar].view;
       game.chars[aschar].animating=(1 | CHANIM_REPEAT | (CHANIM_SPEED << 8));
       game.chars[aschar].view=game.chars[aschar].talkview;
@@ -2022,6 +2085,9 @@ void DisplaySpeech(char*texx,int askip,int aschar) {
     }
   }
   _display_at(tdxp,tdyp,widd,texx,0,textcol);
+  if (closeupface!=NULL)
+    remove_screen_overlay(OVER_PICTURE);
+  face_talking=-1;
   if (oldview>=0) {
     game.chars[aschar].flags&=(~CHF_FIXVIEW);
     game.chars[aschar].view=oldview;
@@ -2049,9 +2115,7 @@ void __sc_displayspeech(int chid,char *texx)
   DisplaySpeech(texx,1,chid);
 }
 
-int display_message=0;
 void DisplayMessage(int msnum) {
-  display_message=-1;
   if (msnum>=500) { //quit("global message requseted, nto yet supported");
     if (game.messages[msnum-500]==NULL)
       quit("!DisplayGlobalMessage: message not exist");
@@ -2063,7 +2127,6 @@ void DisplayMessage(int msnum) {
       quit("!DisplayMessage: Invalid message number to display");
     int repeatloop=1;
     while (repeatloop) {
-      display_message=msnum;
       if (thisroom.msgi[msnum].displayas>0) {
         DisplaySpeech(thisroom.message[msnum],
           thisroom.msgi[msnum].flags & MSG_TIMELIMIT,
@@ -2080,38 +2143,45 @@ void DisplayMessage(int msnum) {
 }
 
 void CaptureScreen(int clr) {
-  if (screenop!=NULL) wfreeblock(screenop);
-  screenop=wallocblock(scrnwid,scrnhit);
+  remove_screen_overlay(OVER_COMPLETE);
+  block screenop=wallocblock(scrnwid,scrnhit);
   if (clr==0) clr=16;
   clear_to_color(screenop,clr);
-  _global_x_offset=0;
-  _global_y_offset=0;
-  screen_state=2;
+  add_screen_overlay(0,0,OVER_COMPLETE,screenop);
 }
 
 void EndCapture() {
-  if (screen_state!=2)
+  if (is_complete_overlay==0)
     quit("!EndCapture: The screen is not currently captured.");
-  wfreeblock(screenop);
-  screenop=NULL;
-  _global_x_offset=-1;
-  screen_state=0;
+  remove_screen_overlay(OVER_COMPLETE);
 }
 
 void CapturedPrint(int xx,int yy,char*texx,...) {
   char displbuf[300];
-  if (screen_state!=2)
+  if (is_complete_overlay==0)
     quit("!CapturedPrint: The screen is not currently captured.");
   xx*=sxmult; yy*=symult;
   va_list ap;
   va_start(ap,texx);
   vsprintf(displbuf,texx,ap);
   va_end(ap);
-  wsetscreen(screenop);
+  int aa;
+  for (aa=0;aa<numscreenover;aa++) {
+    if (screenover[aa].type==OVER_COMPLETE) {
+      wsetscreen(screenover[aa].pic);
+      break;
+    }
+  }
   wtexttransparent(TEXTFG);
   wtextcolor(16);
   wouttextxy(xx,yy,cbuttfont,displbuf);
   wsetscreen(virtual_screen);
+}
+
+int SaveScreenShot(char*namm) {
+  if (save_bitmap(namm,virtual_screen,palette)!=0)
+    return 0; // failed
+  return 1;  // successful
 }
 
 void SetObjectView(int obn,int vii) {
@@ -2278,7 +2348,7 @@ void run_event_block(EventBlock*evpt,int evnt,int invnum) {
       quit("!ProcessEvent: An inventory event was used, but the Data column\n"
         "was not set. See section 6.1 in the documentation for information.");
     else if ((invnum>=0) && (evpt->data[ee]!=invnum)) continue;
-    if ((invnum>=0) & (invnum<MAX_INV-1)) {
+    if ((evpt->data[ee]>=0) & (evpt->data[ee]<MAX_INV-1) & (invnum>=0)) {
       playerchar->inv[invnum]--;
       if (playerchar->inv[invnum]==0) {
         playerchar->activeinv=-1;
@@ -2360,6 +2430,18 @@ int isposinbox(int mmx,int mmy,int lf,int tp,int rt,int bt) {
   else return FALSE;
   }
 
+// xx,yy is the position in room co-ordinates that we are checking
+// arx,ary is the sprite x/y co-ordinates
+int is_pos_in_sprite(int xx,int yy,int arx,int ary,int pic) {
+  if (isposinbox(xx,yy,arx,ary,(arx-1)+spritewidth[pic]/sxmult,(ary-1)+spriteheight[pic]/symult)==FALSE)
+    return FALSE;
+
+  if (game.options[OPT_PIXPERFECT]==0) ;
+  else if (getpixel(images[pic],(xx-arx)*sxmult,(yy-ary)*symult)==FALSE)
+    return FALSE;
+  return TRUE;
+}
+
 // X and Y co-ordinates must be in 320x200 format
 int check_click_on_object(int xx,int yy,int mood) {
   int aa;
@@ -2367,8 +2449,8 @@ int check_click_on_object(int xx,int yy,int mood) {
   for (aa=0;aa<croom->numobj;aa++) {
     if (objs[aa].on==0) continue;
     int xxx=objs[aa].x,yyy=objs[aa].y;
-    if (isposinbox(xx,yy,xxx,yyy-spriteheight[objs[aa].num]/symult,
-      spritewidth[objs[aa].num]/sxmult+xxx,yyy)==FALSE) ;
+    if (is_pos_in_sprite(xx,yy,xxx,yyy-spriteheight[objs[aa].num]/symult,
+      objs[aa].num)==FALSE) ;
     else {
       int passon=-1,cdata=-1;
       if (mood==MODE_LOOK) passon=0;
@@ -2390,11 +2472,12 @@ int is_pos_on_character(int xx,int yy) {
   for (cc=0;cc<game.numcharacters;cc++) {
     if (game.chars[cc].room!=displayed_room) continue;
     if (game.chars[cc].on==0) continue;
+    if (game.chars[cc].flags & CHF_NOINTERACT) continue;
     CharacterInfo*chin=&game.chars[cc];
     sppic=views[chin->view].frames[chin->loop][chin->frame].pic;
     int xxx=chin->x-spritewidth[sppic]/sxmult/2;
     int yyy=chin->y-spriteheight[sppic]/symult;
-    if (isposinbox(xx,yy,xxx,yyy,xxx+spritewidth[sppic]/sxmult,yyy+spriteheight[sppic]/symult)==0) continue;
+    if (is_pos_in_sprite(xx,yy,xxx,yyy,sppic)==FALSE) continue;
     if (chin->y<lowestyp) continue;
     lowestyp=chin->y;
     lowestwas=cc;
@@ -2451,7 +2534,7 @@ void walk_character(int chac,int tox,int toy,int ignwal,int blk) {
 void ProcessClick(int xx,int yy,int mood) {
   xx+=offsetx/sxmult;
   yy+=offsety/symult;
-  if (mood==MODE_WALK) {
+  if ((mood==MODE_WALK) && (game.options[OPT_NOWALKMODE]==0)) {
     int hsnum=getpixel(thisroom.lookat,xx,yy);
     if (hsnum<1) ;
     else if (thisroom.hswalkto[hsnum].x<1) ;
@@ -2468,6 +2551,7 @@ void ProcessClick(int xx,int yy,int mood) {
   int hotspothere=getpixel(thisroom.lookat,xx,yy);
   int passon=-1,cdata=-1;
   if (mood==MODE_TALK) passon=4;
+  else if (mood==MODE_WALK) passon=0;
   else if (mood==MODE_LOOK) passon=1;
   else if (mood==MODE_HAND) passon=2;
   else if (mood==MODE_USE) { passon=3;
@@ -2790,7 +2874,9 @@ void GetLocationName(int xxx,int yyy,char*tempo) {
     if (objs[aa].on==0) continue;
     int xx=objs[aa].x,yy=objs[aa].y;
     if (isposinbox(xxx,yyy,xx,yy-spriteheight[objs[aa].num]/symult,xx+spritewidth[objs[aa].num]/sxmult,yy)==0) continue;
-    sprintf(tempo,"OBJECT %d",aa);
+    if (thisroom.objectnames[aa][0]==0)
+      sprintf(tempo,"OBJECT %d",aa);
+    else strcpy(tempo,thisroom.objectnames[aa]);
     return;
   }
   onhs=getpixel(thisroom.lookat,xxx,yyy);
@@ -3349,6 +3435,9 @@ int load_game(int slotn) {
   if (getw(ooo)!=scrnhit)
     quit("This game was saved with the interpreter running at a different\n"
       "resolution. It can not be restored.\n");
+  remove_screen_overlay(-1);
+  is_complete_overlay=0;
+  is_text_overlay=0;
   set_game_speed(getw(ooo));
   cur_mode=getw(ooo);
   cur_cursor=getw(ooo);
@@ -3615,8 +3704,10 @@ void setup_script_exports() {
   scAdd_External_Symbol("Random",(void *)__Rand);
   scAdd_External_Symbol("RefreshMouse",(void *)RefreshMouse);
   scAdd_External_Symbol("ReleaseCharacterView",(void *)ReleaseCharacterView);
+  scAdd_External_Symbol("RestartGame",(void *)restart_game);
   scAdd_External_Symbol("RestoreGameDialog",(void *)restore_game_dialog);
   scAdd_External_Symbol("RunDialog",(void *)RunDialog);
+  scAdd_External_Symbol("SaveScreenShot",(void *)SaveScreenShot);
   scAdd_External_Symbol("SaveGameDialog",(void *)save_game_dialog);
   scAdd_External_Symbol("SetCharacterView",(void *)SetCharacterView);
   scAdd_External_Symbol("SetCursorMode",(void *)set_cursor_mode);
@@ -3733,7 +3824,7 @@ int main_game_loop() {
       short*wkptr=(short*)user_disabled_data;
       if (wkptr[0]<0) restrict_until=0; }
     else if (restrict_until==UNTIL_NOOVERLAY) {
-      if (screen_state==0) restrict_until=0; }
+      if (is_text_overlay<1) restrict_until=0; }
     else quit("loop_until: unknown until event");
     if (restrict_until==0) {
       set_default_cursor();
@@ -3797,6 +3888,8 @@ int main(int argc,char*argv[]) {
     else if (stricmp(argv[ee],"-noupdate")==0) debug_flags|=DBG_NOUPDATE;
     else if (stricmp(argv[ee],"-nosound")==0) debug_flags|=DBG_NOSFX;
     else if (stricmp(argv[ee],"-nomusic")==0) debug_flags|=DBG_NOMUSIC;
+    else if (stricmp(argv[ee],"-noscript")==0) debug_flags|=DBG_NOSCRIPT;
+    else if (stricmp(argv[ee],"-dbgscript")==0) debug_flags|=DBG_DBGSCRIPT;
   }
   strcpy(conffilebuf,argv[0]);
   for (ee=0;ee<strlen(conffilebuf);ee++) {
@@ -3829,6 +3922,8 @@ int main(int argc,char*argv[]) {
   }
   scInit_SeeR();
   allegro_init();
+  if (debug_flags & DBG_DBGSCRIPT)
+    scSeeR_Set(scSeeR_OpenDebug, "scrptdbg.log");
   if (init_cd_player()==0) {
 #ifndef WINDOWS_VERSION
     printf("CD-ROM Audio support enabled.\n");
@@ -3942,9 +4037,9 @@ int main(int argc,char*argv[]) {
   if (set_gfx_mode(GFX_AUTODETECT,initasx,initasy,0,0)!=0) {
     set_gfx_mode(GFX_TEXT,80,25,0,0);
     proper_exit=1;
-    printf("There was a problem initializing graphics mode.\n");
-    printf("(Problem: \'%s\')\n",allegro_error);
-    printf("Try to correct the problem, or seek help from the Adventure Creator homepage.\n");
+    DisplayAlert("There was a problem initializing graphics mode.\n"
+      "(Problem: '%s')\n"
+      "Try to correct the problem, or seek help from the AGS homepage.\n",allegro_error);
     return 4;
   }
   if (scrnwid==960) {
