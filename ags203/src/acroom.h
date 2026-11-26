@@ -606,7 +606,7 @@ void save_room(char*files,roomstruct rstruc) {
     }
 
     if (rstruc.compiled_script != NULL) {
-      fputc(BLOCKTYPE_COMPSCRIPT, opty);
+      fputc(BLOCKTYPE_COMPSCRIPT2, opty);
       lee = rstruc.cscriptsize + 4;
       fwrite(&lee, 4, 1, opty);
       lee -= 4;
