@@ -62,8 +62,8 @@ extern int vesa_xres, vesa_yres;
 void mgetgraphpos()
 {
   poll_mouse();
-  mousex = mouse_x;
-  mousey = mouse_y;
+  mousex = (vesa_xres / 320) * mouse_x;
+  mousey = (vesa_yres / 200) * mouse_y;
 
   if (mousex >= vesa_xres)
     mousex = vesa_xres - 1;
@@ -180,10 +180,6 @@ int misbuttondown(int buno)
 
 void mgraphconfine(int x1, int y1, int x2, int y2)
 {
-  x1 *= (vesa_xres / 320);
-  x2 *= (vesa_xres / 320);
-  y1 *= (vesa_yres / 200);
-  y2 *= (vesa_yres / 200);
   set_mouse_range(x1, y1, x2, y2);
 }
 
@@ -203,6 +199,8 @@ int minstalled()
   int nbuts;
   if ((nbuts = install_mouse()) < 2)
     return 0;
+
+  mgraphconfine(0, 0, 319, 199);  // use 320x200 co-ord system
 
   return nbuts;
 }

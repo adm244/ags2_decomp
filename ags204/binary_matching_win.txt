@@ -13,6 +13,7 @@ wouttextxy
 wgtprintf
 wputblock
 wbutt
+(*) DisplayAlert
 cunpackbitl
 fputstring
 fgetstring
@@ -24,8 +25,9 @@ freadmissout
 add_to_eventblock
 load_main_block
 (*) load_room
+unload_amp
+cd_player_control
 amp_decode
-run_setup
 my_readkey
 INIerror
 INIeof
@@ -49,9 +51,11 @@ restore_game_dialog
 save_game_dialog
 prepare_text_script
 post_script_cleanup
-run_text_script
+(*) run_text_script
 run_text_script_iparam
 run_text_script_2iparam
+(*) remove_screen_overlay
+(*) add_screen_overlay
 my_fade_from_range
 my_fade_out
 FadeOut
@@ -61,11 +65,11 @@ save_room_data_segment
 (*) load_new_room
 new_room
 main_loop_until
-(*) run_animation_stage
-(*) run_animation
+run_animation_stage
+run_animation
 setevent
 process_event
-(*) processallevents
+processallevents
 set_mouse_cursor
 set_default_cursor
 find_next_enabled_cursor
@@ -74,39 +78,40 @@ enable_cursor_mode
 disable_cursor_mode
 remove_popup_interface
 process_interface_click
-(*) offset_over_inv
+offset_over_inv
 run_event_block_inv
 check_controls
 fix_player_sprite
-update_stuff
+(*) update_stuff
 printtext
 update_invorder
-(*) draw_interface
+draw_interface
 sort_out_walk_behinds
 clear_sprite_list
 add_to_sprite_list
 draw_sprite_list
 (*) draw_screen_background
-draw_topbar
-(*) update_screen
-atexit_handler
-quit
+(*) draw_topbar
+update_screen
+(*) atexit_handler
+(*) quit
 setup_sierra_interface
 load_game_file
 poll_mp3
 do_corner
-draw_button_background
-(*) break_up_text_into_lines
+(*) draw_button_background
+break_up_text_into_lines
 ensure_text_valid
-_display_at
+(*) _display_at
 DisplayAt
-DisplaySpeech
+(*) DisplaySpeech
 Display
 __sc_displayspeech
-DisplayMessage
-CaptureScreen
-EndCapture
-CapturedPrint
+(*) DisplayMessage
+(*) CaptureScreen
+(*) EndCapture
+(*) CapturedPrint
+(*) SaveScreenShot
 SetObjectView
 SetObjectFrame
 AnimateCharacter
@@ -123,12 +128,13 @@ add_inventory
 RunDialog
 (*) run_event_block
 isposinbox
+(*) is_pos_in_sprite
 (*) check_click_on_object
-is_pos_on_character
+(*) is_pos_on_character
 check_click_on_character
-(*) move_object
+move_object
 walk_character
-ProcessClick
+(*) ProcessClick
 do_movelist_move
 stopmusic
 update_music_volume
@@ -139,8 +145,8 @@ FileOpen
 FileClose
 FileWrite
 FileRead
-(*) InterfaceOn
-(*) InterfaceOff
+InterfaceOn
+InterfaceOff
 IsGamePaused
 NewRoom
 NewRoomEx
@@ -153,7 +159,7 @@ __Rand
 RefreshMouse
 GetCursorMode
 GiveScore
-GetLocationName
+(*) GetLocationName
 GetInvName
 MoveCharacter
 MoveObject
@@ -166,58 +172,57 @@ MoveCharacterToObject
 MoveCharacterToHotspot
 StopMoving
 GetLanguageString
-(*) script_debug
-cd_player_control
+script_debug
 _sc_strcat
 get_graph_variable
 set_graph_variable
-(*) run_graph_commandlist
+run_graph_commandlist
 run_graph_script
 run_dialog_request
 do_conversation
 find_highest_room_entered
 save_game
-load_game
+(*) load_game
 __actual_invscreen
 invscreen
 sc_invscreen
-setup_script_exports
+(*) setup_script_exports
 mainloop
 check_write_access
-main_game_loop
+(*) main_game_loop
 do_main_cycle
 init_cd_player
-main
+(*) main
 __my_wbutt
 multiply_up
 CSCIDrawWindow
 CSCIEraseWindow
 checkcontrols
 finddefaultcontrol
-(*) CSCIWaitMessage
+CSCIWaitMessage
 CSCICreateControl
-draw@PushButton
-pressedon@PushButton
-processmessage@PushButton
-draw@MyListBox
-pressedon@MyListBox
-processmessage@MyListBox
-draw@MyLabel
-draw@MyTextBox
-pressedon@MyTextBox
-processmessage@MyTextBox
+draw
+pressedon
+processmessage
+draw
+pressedon
+processmessage
+draw
+draw
+pressedon
+processmessage
 CSCIDeleteControl
 CSCISendControlMessage
 findfirst
 findclose
 findnext
-(*) preparesavegamelist
+preparesavegamelist
 loadgamedialog
 enternumberwindow
 savegamedialog
 myscimessagebox
 quitdialog
-(*) get_language_text
+get_language_text
 init_language_text
 csetlib
 clibfilesize
@@ -225,24 +230,24 @@ cliboffset
 clibfopen
 myputc
 lzwexpand
-mgetgraphpos
+(*) mgetgraphpos
 domouse
 ismouseinbox
-(*) mgetbutton
+mgetbutton
 misbuttondown
-mgraphconfine
+(*) mgraphconfine
 msetgraphpos
 msethotspot
 (*) minstalled
 init_pathfinder
 line_callback
 can_see_from
-(*) is_route_possible
+is_route_possible
 try_this_square
 __find_route
 find_route
 getlong
 load_script_configuration
-(*) load_graphical_scripts
+load_graphical_scripts
 
 TODO:

@@ -18,6 +18,17 @@
 
 #ifdef WINDOWS_VERSION
 #include "winalleg.h"
+
+void DisplayAlert(const char *text, ...) {
+  char displbuf[600];
+  va_list ap;
+  va_start(ap, text);
+  vsprintf(displbuf, text, ap);
+  va_end(ap);
+  MessageBox(NULL,displbuf,"Adventure Game Studio", MB_OK | MB_ICONINFORMATION);
+}
+#else
+#define DisplayAlert printf
 #endif
 
 #include "acroom.h"
@@ -229,7 +240,6 @@ int my_readkey() {
 #define getch() my_readkey()
 #undef kbhit
 #define kbhit keypressed
-#define DisplayAlert(text) MessageBox(NULL,text,"Adventure Game Studio", MB_OK | MB_ICONINFORMATION)
 #define _dos_getdiskfree _getdiskfree
 #define install_mod(no_voices) -1
 #define load_mod(filename) NULL
@@ -238,8 +248,6 @@ int my_readkey() {
 #define is_mod_playing() 0
 #define destroy_mod(j) 0
 #define set_mod_volume(volume) 0
-#else
-#define DisplayAlert printf
 #endif
 
 char filetouse[80]="C:\\TC\\CHRISJ.INI";
@@ -3978,6 +3986,8 @@ int main(int argc,char*argv[]) {
     }
 #ifdef WINDOWS_VERSION
   install_keyboard();
+  usetup.digicard=-1;
+  usetup.midicard=-1;
 #else
   printf("Checking sound inits.\n");
 #endif
@@ -4010,12 +4020,15 @@ int main(int argc,char*argv[]) {
   our_eip=-10;
   atexit(atexit_handler);
 #ifdef WINDOWS_VERSION
+  set_window_title("Adventure Game Studio");
   srand(time(NULL));
 #else
   srand(time(NULL) % 2000);
 #endif
   init_pathfinder();
+#ifndef WINDOWS_VERSION
   set_gfx_mode(GFX_VGA,320,200,320,200);
+#endif
   abuf=screen; vesa_xres=320; vesa_yres=200;
   scrnwid=320;
   scrnhit=200;
