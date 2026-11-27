@@ -36,6 +36,9 @@ OBJS = $(SRCS:.cpp=.obj)
 
 OBJS_DIR = $(addprefix $(OBJ_DIR)/,$(OBJS))
 
+RES_FILE = version.rc
+RES_DIR = $(OBJ_DIR)/$(RES_FILE:.rc=.res)
+
 LIBS = kernel32.lib user32.lib seer.lib alleg.lib
 
 DEPS = \
@@ -74,12 +77,15 @@ LFLAGS += /opt:ref,icf
 allegro: $(LIB_DIR)/alleg.lib
 seer: $(LIB_DIR)/seer.lib
 
-$(TARGET): $(DEPS) $(OBJS_DIR)
-	$(LD) $(LFLAGS) /out:$(TARGET) $(OBJS_DIR) $(LIBS)
+$(TARGET): $(DEPS) $(OBJS_DIR) $(RES_DIR)
+	$(LD) $(LFLAGS) /out:$(TARGET) $(OBJS_DIR) $(RES_DIR) $(LIBS)
 	@cp -f $(LIB_DIR)/*.dll $(BIN_DIR)/
 
 $(OBJ_DIR)/%.obj: $(SRC_DIR)/%.cpp
 	$(CXX) /c $(CFLAGS) /Fo$@ $<
+
+$(OBJ_DIR)/%.res: $(SRC_DIR)/%.rc
+	$(RC) /fo$@ $<
 
 $(LIB_DIR)/alleg.lib:
 	@$(MAKE) -C $(DEP_DIR)/all3927
